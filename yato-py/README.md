@@ -35,7 +35,7 @@ janela) e, no futuro, trocar o Ollama por outra coisa mexendo só num lugar.
 1. **Python 3.12+** (já tem) e o **Ollama** instalado e aberto.
 2. O modelo baixado:
    ```bash
-   ollama pull gemma3:4b
+   ollama pull qwen2.5:7b
    ```
 
 ## Como rodar
@@ -76,18 +76,21 @@ Ele manda uma pergunta de teste e imprime a resposta da Yato no terminal.
 O modelo é a constante `MODELO`, no topo de `cerebro.py`. Opções que cabem
 numa GPU de 8 GB (baixe antes com `ollama pull <nome>`):
 
-| Modelo         | Tamanho | Observação                              |
-| -------------- | ------- | --------------------------------------- |
-| `gemma3:4b`    | ~3 GB   | Ótimo português e rápido — o padrão     |
-| `qwen2.5:7b`   | ~4,7 GB | Mais "esperto", um pouco mais lento     |
-| `llama3.1:8b`  | ~4,9 GB | Clássico, bom equilíbrio                 |
+| Modelo         | Tamanho | Observação                                        |
+| -------------- | ------- | -------------------------------------------------- |
+| `qwen2.5:7b`   | ~4,7 GB | O padrão atual: mais conhecimento e raciocínio; suporta ferramentas (futuro agente) |
+| `llama3.1:8b`  | ~4,9 GB | Clássico, mesmo nível — questão de gosto           |
+| `gemma3:4b`    | ~3 GB   | O primeiro cérebro: mais leve/rápido, porém raso — e enxerga IMAGENS (útil na rodada de visão) |
+
+Modelos maiores (12B+) **não** cabem nos 8 GB de VRAM: vazam pra RAM e a
+velocidade despenca. Esse é o teto do hardware.
 
 ## Ajustes finos (constantes no topo de `cerebro.py`)
 
 | Constante             | Padrão | O que controla                                          |
 | --------------------- | ------ | ------------------------------------------------------- |
-| `MODELO`              | gemma3:4b | Qual cérebro usar                                     |
-| `MAX_TOKENS_RESPOSTA` | 300    | Teto duro de tamanho de cada resposta                    |
+| `MODELO`              | qwen2.5:7b | Qual cérebro usar                                    |
+| `MAX_TOKENS_RESPOSTA` | 500    | Teto duro de tamanho de cada resposta                    |
 | `LIMITE_HISTORICO`    | 20     | Quantas falas recentes o modelo enxerga (personalidade sempre entra) |
 
 O limite de histórico existe porque o modelo só "vê" 4096 tokens por vez:
@@ -115,7 +118,20 @@ temperatura usada. Experimento clássico: faça a mesma pergunta em 0.0 e em
 
 Ao abrir, o app **acorda o cérebro** em segundo plano (o modelo carrega na
 GPU enquanto você digita) — o status no topo mostra `● pronta` ou
-`● Ollama fechado`.
+`● Ollama fechado`. As respostas chegam em **streaming**: o texto pinga na
+tela palavra por palavra, que é literalmente a geração token-a-token do
+modelo ficando visível.
+
+## Sua conversa fica salva
+
+Ao fechar e reabrir, a Yato **lembra da conversa**: cada troca é gravada em
+`conversa.json` (na pasta do projeto — abra e espie, é legível). Detalhes:
+
+- A **personalidade nunca é salva** — ela vem sempre fresca do
+  `personalidade.py`; o arquivo guarda só as falas.
+- Arquivo corrompido ou apagado? O app **não quebra**: começa do zero.
+- O botão **🧹 Nova conversa** apaga a memória da tela E do disco.
+- `conversa.json` está no `.gitignore`: conversa é dado pessoal, não código.
 
 ## Se algo der errado
 
@@ -124,16 +140,42 @@ GPU enquanto você digita) — o status no topo mostra `● pronta` ou
 - Erros ficam registrados no **`yato.log`** (na pasta do projeto), mesmo
   quando o app é aberto pelo atalho, sem terminal. Deu algo estranho? Olha lá.
 
-## Próximas ideias (rumo: entender como a IA funciona)
+## Roadmap (rumo: entender como a IA funciona)
 
+O projeto evolui em **rodadas** — cada uma vira um commit com nome claro.
+
+### ✅ Rodada 1 — Robustez
 - [x] Limitar o histórico enviado (a personalidade nunca "cai da mesa")
 - [x] Erros com mensagens específicas + diário de bordo (`yato.log`)
 - [x] Teto duro de tamanho de resposta (`num_predict`)
-- [x] Deslizador de **temperatura** pra ver, ao vivo, a IA ficar mais/menos criativa
+
+### ✅ Rodada 2 — Laboratório de ML
+- [x] Deslizador de **temperatura** (ver, ao vivo, a IA mais/menos criativa)
 - [x] Métricas de cada resposta na tela (tokens, tempo, velocidade)
 - [x] Botão **nova conversa** (zerar a memória sem fechar o app)
 - [x] Acordar o cérebro ao abrir + status `● pronta`
-- [ ] Resposta em *streaming* (texto aparecendo aos poucos, palavra por palavra)
+
+### ✅ Rodada 3 — Experiência
+- [x] Resposta em *streaming* (texto aparecendo palavra por palavra)
+- [x] Salvar a conversa entre sessões (persistência em JSON, leitura segura)
+- [x] Revisão das rodadas 1–2: `acordar()` com tentativas (status não mente
+      mais quando o atalho abre Ollama + app juntos) e rotação do `yato.log`
+
+### 📋 Rodada 4 — Memória e usabilidade
+- [ ] **Memória de fatos**: a Yato anota coisas sobre você e te "conhece"
+      entre sessões (os fatos entram no system prompt)
+- [ ] Texto das bolhas **selecionável/copiável**
+
+### 📋 Rodada 5 — Visão 👁️
+- [ ] Anexar prints/imagens no chat (o gemma3:4b já enxerga imagens)
+- [ ] Evolução: tradutor de tela com tecla de atalho
+
+### 📋 Rodada 6 — Voz 🎤
+- [ ] Ouvir (Whisper local) e falar (Piper, voz pt-BR) — tudo offline
+
+### 💡 Depois (sem número ainda)
+- [ ] Ferramentas / function calling: a Yato executa ações de verdade
+      (exige modelo com suporte, ex.: qwen2.5:7b)
 - [ ] Mostrar os **tokens** (como a IA "fatia" o texto em pedaços)
-- [ ] Salvar a conversa entre sessões
-- [ ] Trocar o Ollama por código que roda o modelo direto (ver as engrenagens)
+- [ ] O chefão final: trocar o Ollama por código que roda o modelo direto
+      (ver as engrenagens)

@@ -7,3 +7,7 @@ __pycache__/
 
 # Diário de bordo local (só interessa nesta máquina)
 yato.log
+yato.log.*
+
+# Sua conversa com a Yato é DADO PESSOAL, não código — fica só aqui
+conversa.json

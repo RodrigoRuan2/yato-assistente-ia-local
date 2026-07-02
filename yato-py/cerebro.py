@@ -7,6 +7,8 @@ Repare que aqui NÃO existe nada de janela/botão. É de propósito: a lógica d
   - no futuro, se você trocar o Ollama por outra coisa, mexe só aqui.
 """
 
+import json
+import time
 from dataclasses import dataclass
 
 import requests
@@ -15,14 +17,17 @@ import requests
 # enquanto está aberto (ícone perto do relógio do Windows).
 OLLAMA_URL = "http://localhost:11434/api/chat"
 
-# Qual modelo usar. Precisa estar baixado antes: `ollama pull gemma3:4b`.
-# Trocar de modelo = trocar este nome.
-MODELO = "gemma3:4b"
+# Qual modelo usar. Precisa estar baixado antes: `ollama pull qwen2.5:7b`.
+# Trocar de modelo = trocar este nome. (Histórico: começamos no gemma3:4b;
+# subimos pro qwen2.5:7b — quase 2x o cérebro, ainda 100% na GPU de 8 GB —
+# quando as respostas estavam rasas demais. Modelo maior = mais conhecimento.)
+MODELO = "qwen2.5:7b"
 
-# Teto DURO de tokens por resposta. A personalidade já PEDE respostas curtas,
-# mas modelo pequeno às vezes desobedece e dispara um textão. Defesa em
-# camadas: a regra vale no pedido (prompt) E na infraestrutura (este número).
-MAX_TOKENS_RESPOSTA = 300
+# Teto DURO de tokens por resposta — a rede de segurança contra textão
+# infinito. 500 dá espaço pra explicações de verdade; a personalidade é
+# quem pede proporção (papo curto = resposta curta). Defesa em camadas:
+# a regra fina no prompt, o limite bruto na infraestrutura.
+MAX_TOKENS_RESPOSTA = 500
 
 # Quantas falas recentes o modelo enxerga (a personalidade não entra na conta).
 # Por quê: o modelo só "vê" 4096 tokens por vez. Se mandássemos a conversa
@@ -73,7 +78,7 @@ def _podar(mensagens):
     return sistema + conversa[-LIMITE_HISTORICO:]
 
 
-def pensar(mensagens, temperatura=TEMPERATURA_PADRAO):
+def pensar(mensagens, temperatura=TEMPERATURA_PADRAO, ao_receber=None):
     """Manda a conversa pro Ollama e devolve uma Resposta (texto + métricas).
 
     `mensagens` é uma lista no formato que a IA entende. Exemplo:
@@ -84,6 +89,11 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO):
             {"role": "user",      "content": "tudo bem?"},
         ]
 
+    `ao_receber` é um CALLBACK (uma função que você entrega pra ser chamada
+    de volta): se vier, ela é chamada com cada PEDACINHO de texto assim que
+    a IA o gera — é o "streaming", o texto pingando ao vivo. Se não vier,
+    o comportamento é o antigo: espera tudo e devolve no final.
+
     Detalhe-chave de como a IA funciona: ela NÃO tem memória entre chamadas.
     Cada chamada é uma folha em branco pra ela. Por isso mandamos a conversa
     INTEIRA toda vez — é isso que cria a ilusão de que ela "lembra".
@@ -93,7 +103,10 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO):
             OLLAMA_URL,
             json={
                 "model": MODELO,
-                "stream": False,   # a resposta inteira de uma vez (sem ser letra a letra)
+                # stream=True: o Ollama manda a resposta AOS PEDAÇOS, um
+                # token por linha, em vez de tudo de uma vez no final.
+                # É a geração palavra-a-palavra ficando visível.
+                "stream": True,
                 "messages": _podar(mensagens),   # o modelo só vê o que cabe na "mesa"
                 # Mantém o modelo carregado na memória por 10 min após a última
                 # conversa. Sem isso, ele sai da memória rápido e CADA mensagem
@@ -109,8 +122,26 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO):
             # inclui o carregamento do modelo na placa de vídeo (~20s, e até
             # minutos em casos ruins). As seguintes respondem em segundos.
             timeout=300,
+            stream=True,   # o do requests: "não baixe tudo, me dê aos poucos"
         )
         resposta.raise_for_status()             # erro HTTP vira exceção aqui
+
+        # ---- A leitura do pinga-pinga ----
+        # Cada linha que chega é um JSON pequeno: {"message": {"content": "pe"},
+        # "done": false}. A ÚLTIMA linha vem com done=true E as métricas.
+        partes = []
+        final = {}
+        for linha in resposta.iter_lines():
+            if not linha:
+                continue
+            dado = json.loads(linha)
+            pedaco = dado.get("message", {}).get("content", "")
+            if pedaco:
+                partes.append(pedaco)
+                if ao_receber:
+                    ao_receber(pedaco)   # avisa a tela: "chegou mais um pedaço!"
+            if dado.get("done"):
+                final = dado             # guarda a linha final (tem as métricas)
 
     # ----- Tradução de erros: de "tecniquês" pra recado claro -----
     except requests.exceptions.ConnectionError:
@@ -127,18 +158,20 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO):
                 f"(no terminal: ollama pull {MODELO})"
             )
         raise CerebroError(f"O Ollama reclamou: erro {resposta.status_code} 😬")
+    except requests.exceptions.RequestException:
+        # Qualquer outro tropeço de rede (ex.: conexão caiu NO MEIO do streaming).
+        raise CerebroError("Nossa conexão caiu no meio da frase 😵 Tenta de novo?")
 
-    dados = resposta.json()
     return Resposta(
-        texto=dados["message"]["content"].strip(),
-        tokens=dados.get("eval_count", 0),
+        texto="".join(partes).strip(),
+        tokens=final.get("eval_count", 0),
         # eval_duration vem em NANOssegundos (bilionésimos de segundo);
         # dividir por 1 bilhão converte pra segundos normais.
-        segundos=dados.get("eval_duration", 0) / 1_000_000_000,
+        segundos=final.get("eval_duration", 0) / 1_000_000_000,
     )
 
 
-def acordar():
+def acordar(tentativas=6, espera=5):
     """Pede pro Ollama CARREGAR o modelo na GPU — sem gerar resposta nenhuma.
 
     Truque documentado da API: um pedido com a lista de mensagens VAZIA só
@@ -146,17 +179,28 @@ def acordar():
     plano) assim que abre: os ~20s de carregamento acontecem ENQUANTO você
     digita a primeira mensagem, em vez de te fazer esperar depois dela.
 
+    POR QUE AS TENTATIVAS: o atalho "Iniciar Yato" abre o Ollama e a janela
+    JUNTOS — e o servidor do Ollama leva alguns segundos pra ficar de pé.
+    Se tentássemos uma vez só, o status diria "Ollama fechado" (mentira!)
+    só porque chegamos cedo demais. Então insistimos por até ~30s antes
+    de desistir de verdade.
+
     Devolve True se o cérebro ficou pronto, False se o Ollama não respondeu.
     """
-    try:
-        r = requests.post(
-            OLLAMA_URL,
-            json={"model": MODELO, "messages": [], "keep_alive": "10m"},
-            timeout=180,
-        )
-        return r.ok
-    except requests.exceptions.RequestException:
-        return False
+    for tentativa in range(tentativas):
+        try:
+            r = requests.post(
+                OLLAMA_URL,
+                json={"model": MODELO, "messages": [], "keep_alive": "10m"},
+                timeout=180,
+            )
+            if r.ok:
+                return True
+        except requests.exceptions.RequestException:
+            pass  # servidor ainda subindo (ou fechado) — tenta de novo
+        if tentativa < tentativas - 1:   # não dorme depois da última
+            time.sleep(espera)
+    return False
 
 
 # ---------------------------------------------------------------------------
