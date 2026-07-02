@@ -94,6 +94,29 @@ O limite de histórico existe porque o modelo só "vê" 4096 tokens por vez:
 sem o corte controlado, conversas longas perderiam o começo **em silêncio** —
 inclusive a personalidade.
 
+## O laboratório 🌡️
+
+A janela tem um **deslizador de temperatura** (0.0 a 1.5) — o "grau de
+ousadia" do modelo ao escolher cada palavra:
+
+- **0.0** → sempre a palavra mais provável: respostas previsíveis e
+  repetíveis (a mesma pergunta dá a MESMA resposta).
+- **1.5** → aceita palavras improváveis: criativa, variada, às vezes doida.
+
+Cada resposta da Yato vem com uma **etiqueta de métricas**:
+
+```
+15 tokens · 0.3s · 59 tok/s · 🌡️ 0.3
+```
+
+= quantos tokens ela gerou, em quanto tempo, a velocidade da GPU e a
+temperatura usada. Experimento clássico: faça a mesma pergunta em 0.0 e em
+1.5 e compare (o botão **🧹 Nova conversa** zera a memória entre testes).
+
+Ao abrir, o app **acorda o cérebro** em segundo plano (o modelo carrega na
+GPU enquanto você digita) — o status no topo mostra `● pronta` ou
+`● Ollama fechado`.
+
 ## Se algo der errado
 
 - A Yato responde com mensagens diferentes pra cada problema: Ollama fechado,
@@ -106,8 +129,11 @@ inclusive a personalidade.
 - [x] Limitar o histórico enviado (a personalidade nunca "cai da mesa")
 - [x] Erros com mensagens específicas + diário de bordo (`yato.log`)
 - [x] Teto duro de tamanho de resposta (`num_predict`)
+- [x] Deslizador de **temperatura** pra ver, ao vivo, a IA ficar mais/menos criativa
+- [x] Métricas de cada resposta na tela (tokens, tempo, velocidade)
+- [x] Botão **nova conversa** (zerar a memória sem fechar o app)
+- [x] Acordar o cérebro ao abrir + status `● pronta`
 - [ ] Resposta em *streaming* (texto aparecendo aos poucos, palavra por palavra)
-- [ ] Deslizador de **temperatura** pra ver, ao vivo, a IA ficar mais/menos criativa
 - [ ] Mostrar os **tokens** (como a IA "fatia" o texto em pedaços)
 - [ ] Salvar a conversa entre sessões
 - [ ] Trocar o Ollama por código que roda o modelo direto (ver as engrenagens)

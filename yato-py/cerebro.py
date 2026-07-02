@@ -7,6 +7,8 @@ Repare que aqui NÃO existe nada de janela/botão. É de propósito: a lógica d
   - no futuro, se você trocar o Ollama por outra coisa, mexe só aqui.
 """
 
+from dataclasses import dataclass
+
 import requests
 
 # Endereço do Ollama na SUA máquina. O Ollama abre esse "servidorzinho" local
@@ -28,6 +30,29 @@ MAX_TOKENS_RESPOSTA = 300
 # corte come do começo, onde mora a PERSONALIDADE. Nós decidimos o corte antes.
 LIMITE_HISTORICO = 20
 
+# Temperatura padrão: o "grau de ousadia" do modelo ao escolher cada palavra.
+# 0.0 = pega sempre a palavra mais provável (previsível, repetitivo).
+# 1.5 = se permite palavras improváveis (criativo, às vezes doido).
+TEMPERATURA_PADRAO = 0.8
+
+
+@dataclass
+class Resposta:
+    """Uma 'pensada' completa: o texto E os números por trás dele.
+
+    (@dataclass é um atalho do Python: gera sozinho o __init__ e afins de uma
+    classe que só carrega dados.) Antes a gente jogava esses números fora;
+    agora eles aparecem na tela — cada resposta vira um experimento medido.
+    """
+    texto: str        # a fala da Yato
+    tokens: int       # quantos tokens ela gerou nesta resposta
+    segundos: float   # tempo gasto GERANDO (não conta carregar o modelo)
+
+    @property
+    def velocidade(self):
+        """Tokens por segundo — o 'fôlego' da sua GPU nesta resposta."""
+        return self.tokens / self.segundos if self.segundos > 0 else 0.0
+
 
 class CerebroError(Exception):
     """Erro já traduzido pra uma mensagem amigável, pronta pra mostrar na tela.
@@ -48,8 +73,8 @@ def _podar(mensagens):
     return sistema + conversa[-LIMITE_HISTORICO:]
 
 
-def pensar(mensagens):
-    """Manda a conversa pro Ollama e devolve o TEXTO da resposta da IA.
+def pensar(mensagens, temperatura=TEMPERATURA_PADRAO):
+    """Manda a conversa pro Ollama e devolve uma Resposta (texto + métricas).
 
     `mensagens` é uma lista no formato que a IA entende. Exemplo:
         [
@@ -77,6 +102,7 @@ def pensar(mensagens):
                 # Ajustes passados direto pro MODELO (não pro servidor):
                 "options": {
                     "num_predict": MAX_TOKENS_RESPOSTA,  # trava dura de tamanho
+                    "temperature": temperatura,          # ousadia DESTA resposta
                 },
             },
             # Generoso de propósito: a PRIMEIRA chamada depois de ligar o PC
@@ -102,7 +128,35 @@ def pensar(mensagens):
             )
         raise CerebroError(f"O Ollama reclamou: erro {resposta.status_code} 😬")
 
-    return resposta.json()["message"]["content"].strip()
+    dados = resposta.json()
+    return Resposta(
+        texto=dados["message"]["content"].strip(),
+        tokens=dados.get("eval_count", 0),
+        # eval_duration vem em NANOssegundos (bilionésimos de segundo);
+        # dividir por 1 bilhão converte pra segundos normais.
+        segundos=dados.get("eval_duration", 0) / 1_000_000_000,
+    )
+
+
+def acordar():
+    """Pede pro Ollama CARREGAR o modelo na GPU — sem gerar resposta nenhuma.
+
+    Truque documentado da API: um pedido com a lista de mensagens VAZIA só
+    carrega o modelo e devolve na hora. A janela chama isto (em segundo
+    plano) assim que abre: os ~20s de carregamento acontecem ENQUANTO você
+    digita a primeira mensagem, em vez de te fazer esperar depois dela.
+
+    Devolve True se o cérebro ficou pronto, False se o Ollama não respondeu.
+    """
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json={"model": MODELO, "messages": [], "keep_alive": "10m"},
+            timeout=180,
+        )
+        return r.ok
+    except requests.exceptions.RequestException:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -125,4 +179,6 @@ if __name__ == "__main__":
         {"role": "user", "content": "oi, se apresenta rapidinho"},
     ]
     print("Pensando... (a 1ª resposta após ligar o PC demora um pouco)\n")
-    print("Yato:", pensar(conversa))
+    r = pensar(conversa)
+    print("Yato:", r.texto)
+    print(f"({r.tokens} tokens em {r.segundos:.1f}s = {r.velocidade:.0f} tokens/s)")
