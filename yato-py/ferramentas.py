@@ -24,22 +24,28 @@ from ddgs import DDGS
 # a leitura E sobra mesa pro resto.
 MAX_CARACTERES_PAGINA = 6000
 
+# Teto MENOR pra leitura embutida na busca enriquecida: ela chega junto com
+# os resultados da busca, então o orçamento é dividido entre os dois.
+MAX_CARACTERES_BUSCA = 4000
+
 
 def buscar_web(termo, max_resultados=4):
-    """Busca no DuckDuckGo e devolve os melhores resultados como texto.
+    """BUSCA ENRIQUECIDA: busca no DuckDuckGo E já lê a melhor página.
 
-    Se a busca FALHAR (sem internet, limite de uso), devolvemos o erro COMO
-    TEXTO pro modelo — assim ele avisa o usuário com jeito, em vez de o app
-    quebrar. Falha de ferramenta não é falha do cérebro.
+    Por que "enriquecida": os resuminhos do buscador (2 linhas cada) muitas
+    vezes não contêm a resposta — ela mora DENTRO das páginas. O plano era
+    o modelo abrir a página sozinho com ler_pagina... mas os testes provaram
+    que o 7B não tem essa iniciativa (nem quando mandamos!). Solução de
+    engenharia: quando o modelo não é confiável numa etapa, a etapa vira
+    CÓDIGO determinístico. Aqui, a leitura acontece SEMPRE, automaticamente.
+
+    Se a busca falhar, o erro vira texto pro modelo avisar com jeito.
+    Se só a LEITURA falhar, degrada com elegância: entrega os resuminhos.
     """
     try:
         resultados = DDGS().text(termo, region="br-pt", max_results=max_resultados)
         if not resultados:
             return "(A busca não retornou nenhum resultado.)"
-        return "\n\n".join(
-            f"[{r['title']}]\n{r['body']}\nFonte: {r['href']}"
-            for r in resultados
-        )
     except Exception as erro:
         logging.warning("Busca na web falhou: %s", erro)
         return (
@@ -48,33 +54,64 @@ def buscar_web(termo, max_resultados=4):
             "você já souber, deixando claro que pode estar desatualizado.)"
         )
 
+    cartoes = "\n\n".join(
+        f"[{r['title']}]\n{r['body']}\nFonte: {r['href']}"
+        for r in resultados
+    )
 
-def ler_pagina(url):
-    """Abre uma página da web e devolve só o TEXTO legível dela.
+    # ---- O enriquecimento: abre a 1ª página que der certo (tenta até 2).
+    # Sites bloqueiam robôs às vezes; se um falhar, o próximo da lista serve.
+    leitura = ""
+    for r in resultados[:2]:
+        try:
+            texto = _baixar_texto(r["href"], MAX_CARACTERES_BUSCA)
+            if texto:
+                leitura = (
+                    f"\n\n===== CONTEÚDO DA PÁGINA MAIS RELEVANTE "
+                    f"({r['href']}) =====\n{texto}"
+                )
+                break
+        except Exception as erro:
+            logging.warning("Enriquecimento falhou (%s): %s", r["href"], erro)
+
+    return "===== RESULTADOS DA BUSCA =====\n\n" + cartoes + leitura
+
+
+def _baixar_texto(url, limite):
+    """Baixa uma página e devolve só o texto legível (uso interno).
 
     O trabalho de verdade aqui é a LIMPEZA: uma página crua é 90% HTML de
     layout (menus, scripts, propaganda). O BeautifulSoup tira o código e
-    sobra o conteúdo — que ainda é cortado no teto pra caber na "mesa".
+    sobra o conteúdo — cortado no `limite` pra caber na "mesa".
+
+    Repare: esta função EXPLODE se algo der errado (deixa a exceção subir).
+    Quem decide o que fazer com a falha é quem chamou — a ferramenta pública
+    traduz pro modelo; a busca enriquecida tenta a próxima página.
     """
+    resposta = requests.get(
+        url,
+        timeout=15,
+        # Alguns sites recusam pedidos "sem identidade"; este cabeçalho
+        # nos apresenta como um navegador comum.
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+    )
+    resposta.raise_for_status()
+    sopa = BeautifulSoup(resposta.text, "html.parser")
+    # scripts/estilos não são conteúdo — fora antes de extrair o texto
+    for lixo in sopa(["script", "style", "noscript"]):
+        lixo.decompose()
+    texto = " ".join(sopa.get_text(separator=" ").split())
+    if len(texto) > limite:
+        texto = texto[:limite] + " (...página cortada aqui...)"
+    return texto
+
+
+def ler_pagina(url):
+    """A ferramenta pública: abre uma página e devolve o texto — ou o erro
+    traduzido em recado, pro modelo se virar sem quebrar o app."""
     try:
-        resposta = requests.get(
-            url,
-            timeout=15,
-            # Alguns sites recusam pedidos "sem identidade"; este cabeçalho
-            # nos apresenta como um navegador comum.
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-        )
-        resposta.raise_for_status()
-        sopa = BeautifulSoup(resposta.text, "html.parser")
-        # scripts/estilos não são conteúdo — fora antes de extrair o texto
-        for lixo in sopa(["script", "style", "noscript"]):
-            lixo.decompose()
-        texto = " ".join(sopa.get_text(separator=" ").split())
-        if not texto:
-            return "(A página abriu mas não tem texto legível.)"
-        if len(texto) > MAX_CARACTERES_PAGINA:
-            texto = texto[:MAX_CARACTERES_PAGINA] + " (...página cortada aqui...)"
-        return texto
+        texto = _baixar_texto(url, MAX_CARACTERES_PAGINA)
+        return texto or "(A página abriu mas não tem texto legível.)"
     except Exception as erro:
         logging.warning("Leitura de página falhou (%s): %s", url, erro)
         return (f"(Não consegui abrir a página {url} — site fora do ar, "
@@ -93,8 +130,10 @@ FERRAMENTAS = [
                 "Busca informações ATUAIS na internet: notícias, preços, "
                 "cotações, resultados de jogos, lançamentos e eventos "
                 "recentes — qualquer fato que pode ter mudado depois do seu "
-                "treino. NÃO use para conversa casual nem para conhecimento "
-                "estável (conceitos, história, programação)."
+                "treino. Devolve os resultados da busca E o conteúdo da "
+                "página mais relevante, já aberto pra você. NÃO use para "
+                "conversa casual nem para conhecimento estável (conceitos, "
+                "história, programação)."
             ),
             "parameters": {
                 "type": "object",
@@ -144,7 +183,8 @@ _EXECUTORES = {
 def descrever(nome, argumentos):
     """Frase curta do que a ferramenta está fazendo — pro aviso na tela."""
     if nome == "buscar_web":
-        return f"buscando na web: {argumentos.get('termo', '?')}"
+        # "pesquisando" porque a busca enriquecida também LÊ a melhor página
+        return f"pesquisando na web: {argumentos.get('termo', '?')}"
     if nome == "ler_pagina":
         return f"lendo a página: {argumentos.get('url', '?')[:60]}"
     return f"usando {nome}"

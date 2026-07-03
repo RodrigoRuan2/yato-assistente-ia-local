@@ -134,13 +134,16 @@ modelo ficando visível.
 O Yato é um **agente**: junto de cada mensagem, ele recebe a lista de
 ferramentas disponíveis e **decide sozinho** se precisa delas. Duas mãos:
 
-- **`buscar_web(termo)`** — busca no DuckDuckGo (via `ddgs`, grátis e sem
-  chave) e devolve os melhores resultados resumidos;
-- **`ler_pagina(url)`** — quando o resumo da busca não basta, ele **abre a
-  página** mais promissora e lê o conteúdo (limpo de HTML e cortado pra
-  caber no contexto).
+- **`buscar_web(termo)`** — a **busca enriquecida**: busca no DuckDuckGo
+  (via `ddgs`, grátis e sem chave) e **já abre e lê a página mais
+  relevante automaticamente**, entregando os resultados + o conteúdo real.
+  Por quê: os testes provaram que o modelo 7B não abre páginas por
+  iniciativa própria — então a etapa virou código determinístico
+  (quando o modelo não é confiável numa etapa, a etapa vira código);
+- **`ler_pagina(url)`** — abre uma página específica quando você (ou ele)
+  quiser ler algo além do que a busca trouxe.
 
-O balão mostra a ação ao vivo (`🔍 buscando na web: ...` / `🔍 lendo a
+O balão mostra a ação ao vivo (`🔍 pesquisando na web: ...` / `🔍 lendo a
 página: ...`) e a etiqueta registra quantas idas à web a resposta usou.
 O cérebro também recebe a **data de hoje** a cada chamada — sem isso ele
 buscava "lançamentos maio 2023" em pleno 2026 (aconteceu nos testes).
@@ -200,6 +203,9 @@ O projeto evolui em **rodadas** — cada uma vira um commit com nome claro.
 - [x] Aviso da ação ao vivo no balão + contador de idas à web na etiqueta
 - [x] Contexto 4096 → 8192 tokens (espaço pros resultados de busca)
 - [x] Data de hoje injetada a cada chamada (senão ele busca no passado)
+- [x] **Busca enriquecida**: a busca já lê a melhor página sozinha
+      (verificado: 7/7 itens da resposta rastreáveis até a fonte)
+- [x] Listas longas em blocos paginados ("continua" segue de onde parou)
 
 ### 📋 Rodada 5 — Memória e usabilidade
 - [ ] **Memória de fatos**: o Yato anota coisas sobre você e te "conhece"
