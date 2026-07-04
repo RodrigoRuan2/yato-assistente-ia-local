@@ -14,7 +14,8 @@ from datetime import datetime
 
 import requests
 
-from ferramentas import FERRAMENTAS, FERRAMENTAS_WEB, executar, descrever
+from ferramentas import (FERRAMENTAS, FERRAMENTAS_WEB, FERRAMENTAS_IMAGEM,
+                         executar, descrever)
 from memoria import carregar_fatos
 
 # Endereço do Ollama na SUA máquina. O Ollama abre esse "servidorzinho" local
@@ -34,9 +35,9 @@ MODELO = "qwen2.5:7b"
 MAX_TOKENS_RESPOSTA = 500
 
 # Quantas falas recentes o modelo enxerga (a personalidade não entra na conta).
-# Por quê: o modelo só "vê" 4096 tokens por vez. Se mandássemos a conversa
-# inteira pra sempre, o excedente seria cortado EM SILÊNCIO pelo Ollama — e o
-# corte come do começo, onde mora a PERSONALIDADE. Nós decidimos o corte antes.
+# Por quê: a "mesa" do modelo é finita (CONTEXTO tokens, logo abaixo). Se
+# mandássemos a conversa inteira pra sempre, o excedente seria cortado EM
+# SILÊNCIO pelo Ollama — e o corte come do começo, onde mora a PERSONALIDADE.
 LIMITE_HISTORICO = 20
 
 # Temperatura padrão: o "grau de ousadia" do modelo ao escolher cada palavra.
@@ -74,6 +75,7 @@ class Resposta:
     tokens: int       # quantos tokens ele gerou nesta resposta
     segundos: float   # tempo gasto GERANDO (não conta carregar o modelo)
     buscas: int = 0   # quantas idas à web esta resposta precisou
+    olhadas: int = 0  # quantas vezes o olho (ver_imagem) foi usado
     fonte: str = ""   # o que as ferramentas trouxeram (pra reusar no próximo turno)
 
     @property
@@ -102,7 +104,7 @@ def _podar(mensagens):
 
 
 def pensar(mensagens, temperatura=TEMPERATURA_PADRAO, ao_receber=None, ao_buscar=None,
-           fonte_anterior=None):
+           fonte_anterior=None, imagem=None):
     """Manda a conversa pro Ollama e devolve uma Resposta (texto + métricas).
 
     `mensagens` é uma lista no formato que a IA entende (system/user/assistant).
@@ -123,6 +125,10 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO, ao_receber=None, ao_buscar
     folha em branco. Por isso a conversa inteira vai toda vez.
     """
     conversa = _podar(mensagens)   # cópia de trabalho (não mexe na original)
+
+    buscas_feitas = 0
+    olhadas_feitas = 0
+    coletado = []   # tudo que as ferramentas trouxerem nesta pensada
 
     # ---- Complementos dinâmicos do system prompt ----
     # 1) A data: o modelo NÃO sabe que dia é hoje (treino tem data de corte).
@@ -145,13 +151,41 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO, ao_receber=None, ao_buscar
             "acompanhamento SEM inventar. Se não bastar, busque de novo.\n"
             + fonte_anterior
         )
+    # 4) A imagem anexada: OLHADA AUTOMÁTICA. Testamos pedir pro modelo
+    #    chamar ver_imagem sozinho — ele ignorou o aviso (a eterna falta de
+    #    iniciativa do 7B). Doutrina da casa: etapa não-confiável vira
+    #    código. Anexou imagem = quer que ele veja; o olho roda JÁ, e a
+    #    descrição entra pronta no prompt. A ferramenta segue disponível
+    #    pra segundas olhadas com outra pergunta.
+    if imagem:
+        if ao_buscar:
+            ao_buscar("👁️ olhando a imagem anexada")
+        pergunta_usuario = next(
+            (m["content"] for m in reversed(conversa) if m["role"] == "user"), "")
+        visto = executar("ver_imagem", {
+            # O qwen2.5vl é um leitor LITERAL: se pedir só "descreva", ele
+            # transcreve o texto e ignora o resto. Por isso a pergunta exige
+            # as DUAS coisas, numeradas.
+            "pergunta": ("Responda em duas partes: "
+                         "1) DESCRIÇÃO: tudo que aparece na imagem — objetos, "
+                         "pessoas, formas, cores, layout. "
+                         "2) TEXTO: transcrição fiel de todo texto visível. "
+                         "Pergunta do usuário sobre a imagem: "
+                         + pergunta_usuario),
+            "imagem_b64": imagem,
+        })
+        olhadas_feitas += 1
+        coletado.append("O QUE A IMAGEM ANEXADA CONTÉM (via ver_imagem):\n" + visto)
+        extra += (
+            "\n\n=== O QUE HÁ NA IMAGEM ANEXADA (já vista pela ferramenta "
+            "ver_imagem) ===\n" + visto +
+            "\n(Responda ao usuário com base nesta descrição — ela é "
+            "confiável. Precisa de OUTRO detalhe? Chame ver_imagem de novo.)"
+        )
     conversa = [
         {**m, "content": m["content"] + extra} if m["role"] == "system" else m
         for m in conversa
     ]
-
-    buscas_feitas = 0
-    coletado = []   # tudo que as ferramentas trouxerem nesta pensada
 
     for _ in range(MAX_VOLTAS_FERRAMENTAS):
         partes = []    # pedaços de texto desta volta
@@ -224,6 +258,7 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO, ao_receber=None, ao_buscar
                 # eval_duration vem em NANOssegundos; ÷ 1 bilhão = segundos.
                 segundos=final.get("eval_duration", 0) / 1_000_000_000,
                 buscas=buscas_feitas,
+                olhadas=olhadas_feitas,
                 # A fonte desta pensada, cortada no teto — quem chamou pode
                 # guardá-la e devolvê-la no próximo turno (fonte_anterior).
                 fonte="\n\n".join(coletado)[:MAX_CARACTERES_FONTE],
@@ -239,12 +274,22 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO, ao_receber=None, ao_buscar
             argumentos = pedido.get("function", {}).get("arguments", {}) or {}
             if ao_buscar:
                 ao_buscar(descrever(nome, argumentos))  # mostra a decisão na tela
+            if nome in FERRAMENTAS_IMAGEM:
+                # a imagem entra POR FORA: o modelo (cego) só decide a
+                # pergunta; quem anexa a imagem de verdade é o código.
+                argumentos = {**argumentos, "imagem_b64": imagem}
             resultado = executar(nome, argumentos)
             if nome in FERRAMENTAS_WEB:
                 # só idas à web contam na etiqueta e viram "fonte";
                 # anotar/esquecer fato é ação local, não pesquisa
                 buscas_feitas += 1
                 coletado.append(resultado)
+            elif nome in FERRAMENTAS_IMAGEM:
+                olhadas_feitas += 1
+                # a descrição vira "fonte" também: perguntas seguintes sobre
+                # a mesma imagem usam o TEXTO, sem pagar outra troca de GPU
+                coletado.append("O QUE A IMAGEM ANEXADA CONTÉM (via ver_imagem):\n"
+                                + resultado)
             conversa.append({"role": "tool", "content": resultado, "tool_name": nome})
 
     # Estourou o limite de voltas: melhor parar com uma mensagem honesta

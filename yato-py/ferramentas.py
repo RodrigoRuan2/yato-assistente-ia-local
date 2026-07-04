@@ -30,6 +30,18 @@ MAX_CARACTERES_PAGINA = 6000
 # os resultados da busca, então o orçamento é dividido entre os dois.
 MAX_CARACTERES_BUSCA = 4000
 
+# O OLHO: o modelo de visão. O cérebro (qwen2.5:7b) é CEGO — quando precisa
+# enxergar, esta ferramenta chama o modelo abaixo pra traduzir a imagem em
+# texto. Trocar de olho = trocar esta constante.
+# (Histórico: começamos com gemma3:4b; subimos pro qwen2.5vl:7b após o
+# "ringue dos olhos" — em tela densa 1080p ele leu 12/12 itens contra 11/12
+# do gemma, que errou justamente um valor em dinheiro. OCR é a prioridade.)
+MODELO_VISAO = "qwen2.5vl:7b"
+
+# Mesmo endereço que o cérebro usa (o Ollama serve todos os modelos na
+# mesma porta — quem muda é o campo "model" do pedido).
+OLLAMA_URL = "http://localhost:11434/api/chat"
+
 
 def buscar_web(termo, max_resultados=4):
     """BUSCA ENRIQUECIDA: busca no DuckDuckGo E já lê a melhor página.
@@ -134,6 +146,49 @@ def ler_pagina(url):
                 "o usuário.)")
 
 
+def ver_imagem(pergunta, imagem_b64=None):
+    """O olho emprestado: mostra a imagem anexada pro MODELO_VISAO e devolve
+    o que ele viu, em texto.
+
+    Detalhe de arquitetura: a imagem NÃO vem do modelo (ele é cego e não
+    pode inventá-la) — o app guarda a imagem anexada e o cérebro a injeta
+    aqui por fora, no imagem_b64. O modelo só decide A PERGUNTA.
+
+    keep_alive=0: o olho desocupa a GPU assim que termina — os dois modelos
+    não cabem juntos nos 8 GB, então a mesa precisa vagar pro cérebro voltar.
+    """
+    if not imagem_b64:
+        return ("(Não há imagem anexada nesta mensagem. Peça ao usuário "
+                "pra colar (Ctrl+V) ou anexar uma imagem.)")
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": MODELO_VISAO,
+                "stream": False,
+                "keep_alive": 0,   # libera a VRAM logo após a olhada
+                "messages": [{
+                    "role": "user",
+                    "content": (pergunta or "Descreva esta imagem em detalhes.")
+                    + "\n(Responda em português brasileiro. Se houver texto na "
+                      "imagem, transcreva-o fielmente.)",
+                    "images": [imagem_b64],   # o campo de imagem da API
+                }],
+                "options": {"num_predict": 700},
+            },
+            # A 1ª olhada inclui CARREGAR o modelo de visão na GPU (~20-40s,
+            # porque o cérebro precisa sair da mesa primeiro).
+            timeout=300,
+        )
+        r.raise_for_status()
+        visto = r.json().get("message", {}).get("content", "").strip()
+        return visto or "(O olho abriu a imagem mas não devolveu descrição.)"
+    except requests.exceptions.RequestException as erro:
+        logging.warning("ver_imagem falhou: %s", erro)
+        return (f"(Não consegui olhar a imagem — Ollama fora do ar ou o "
+                f"modelo de visão '{MODELO_VISAO}' não está baixado.)")
+
+
 # A ficha técnica, no formato padrão (JSON Schema) que a API entende.
 # É ISTO que o modelo lê a cada mensagem pra decidir se busca ou não.
 FERRAMENTAS = [
@@ -212,6 +267,32 @@ FERRAMENTAS = [
     {
         "type": "function",
         "function": {
+            "name": "ver_imagem",
+            "description": (
+                "Olha a IMAGEM ANEXADA à mensagem do usuário e responde o "
+                "que você perguntar sobre ela: descrever a cena, ler/"
+                "transcrever texto, traduzir o que está escrito, identificar "
+                "erros numa tela. Você é CEGO sem esta ferramenta — use-a "
+                "SEMPRE que houver imagem anexada e a conversa se referir a "
+                "ela. Só funciona se o usuário anexou imagem."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pergunta": {
+                        "type": "string",
+                        "description": ("O que você quer saber da imagem. Ex: "
+                                        "'Descreva tudo', 'Transcreva o texto', "
+                                        "'Traduza o que está escrito'"),
+                    }
+                },
+                "required": ["pergunta"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "esquecer_fato",
             "description": (
                 "Apaga fatos da memória permanente. Use quando o usuário "
@@ -239,11 +320,15 @@ _EXECUTORES = {
     "ler_pagina": ler_pagina,
     "anotar_fato": anotar_fato,
     "esquecer_fato": esquecer_fato,
+    "ver_imagem": ver_imagem,
 }
 
 # Quais ferramentas VÃO À WEB (pro contador da etiqueta e pra "fonte").
 # Anotar/esquecer fato mexem só no disco local — não são "idas à web".
 FERRAMENTAS_WEB = {"buscar_web", "ler_pagina"}
+
+# Quais ferramentas precisam da IMAGEM anexada (o cérebro injeta por fora).
+FERRAMENTAS_IMAGEM = {"ver_imagem"}
 
 
 def descrever(nome, argumentos):
@@ -253,6 +338,8 @@ def descrever(nome, argumentos):
         return f"🔍 pesquisando na web: {argumentos.get('termo', '?')}"
     if nome == "ler_pagina":
         return f"🔍 lendo a página: {argumentos.get('url', '?')[:60]}"
+    if nome == "ver_imagem":
+        return f"👁️ olhando a imagem: {argumentos.get('pergunta', '?')[:50]}"
     if nome == "anotar_fato":
         return f"📌 anotando: {argumentos.get('fato', '?')[:60]}"
     if nome == "esquecer_fato":

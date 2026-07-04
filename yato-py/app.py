@@ -13,13 +13,17 @@ Conceitos novos que aparecem aqui e valem estudar:
     separada (de fundo) e devolve o resultado pra tela quando termina.
 """
 
+import base64
+import io
 import logging
 import re
 import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from tkinter import filedialog
 
 import customtkinter as ctk
+from PIL import Image, ImageGrab
 
 from personalidade import PERSONALIDADE
 from cerebro import pensar, acordar, CerebroError, MODELO
@@ -96,6 +100,7 @@ class App(ctk.CTk):
         self.rotulo_pensando = None  # o TEXTO dentro dele (atualiza no streaming)
         self.texto_parcial = ""      # o que já chegou da resposta atual
         self.fonte_atual = ""        # o que a última pesquisa trouxe (pro "continua")
+        self.imagem_anexada = ""     # a imagem colada/anexada (base64), 1 por mensagem
 
         self._montar_tela()
 
@@ -160,13 +165,31 @@ class App(ctk.CTk):
         )
         self.rotulo_dica.pack(side="left")
 
-        # Linha de baixo: campo de digitar + botão enviar.
+        # O "chip" da imagem anexada — só aparece quando tem imagem.
+        self.linha_anexo = ctk.CTkFrame(self, fg_color="transparent")
+        self.chip_anexo = ctk.CTkLabel(
+            self.linha_anexo, text="🖼️ imagem anexada — clique pra remover",
+            text_color="#8ab4f8", cursor="hand2", font=ctk.CTkFont(size=11),
+        )
+        self.chip_anexo.bind("<Button-1>", lambda e: self._remover_imagem())
+        self.chip_anexo.pack(side="left")
+
+        # Linha de baixo: anexar + campo de digitar + botão enviar.
         baixo = ctk.CTkFrame(self, fg_color="transparent")
         baixo.pack(fill="x", padx=12, pady=(0, 12))
+
+        ctk.CTkButton(
+            baixo, text="📎", width=36,
+            fg_color="transparent", border_width=1,
+            command=self._escolher_imagem,
+        ).pack(side="left", padx=(0, 6))
 
         self.entrada = ctk.CTkEntry(baixo, placeholder_text="Fala com o Yato...")
         self.entrada.pack(side="left", fill="x", expand=True)
         self.entrada.bind("<Return>", lambda evento: self.enviar())  # Enter envia
+        # Ctrl+V com IMAGEM no clipboard anexa; com texto, cola normal.
+        self.entrada.bind("<Control-v>", self._colar)
+        self.entrada.bind("<Control-V>", self._colar)
 
         self.botao = ctk.CTkButton(baixo, text="Enviar", width=90, command=self.enviar)
         self.botao.pack(side="left", padx=(8, 0))
@@ -249,6 +272,61 @@ class App(ctk.CTk):
         # after(0, ...) = "tela, atualiza isso quando puder" (thread-safe)
         self.after(0, lambda: self.status.configure(text=texto, text_color=cor))
 
+    # ------------------------------------------------------------ imagem
+    def _colar(self, evento):
+        """Ctrl+V: se o clipboard tem IMAGEM, anexa; senão, deixa colar texto.
+
+        Devolver "break" cancela o comportamento padrão do Tkinter (colar
+        como texto); devolver None deixa ele acontecer. É assim que o mesmo
+        atalho serve pros dois casos.
+        """
+        dado = ImageGrab.grabclipboard()
+        if isinstance(dado, Image.Image):          # print da tela (Win+Shift+S)
+            self._anexar_imagem(dado)
+            return "break"
+        if isinstance(dado, list):                 # arquivo copiado no Explorer
+            for caminho in dado:
+                if str(caminho).lower().endswith((".png", ".jpg", ".jpeg",
+                                                  ".bmp", ".webp")):
+                    try:
+                        self._anexar_imagem(Image.open(caminho))
+                        return "break"
+                    except OSError:
+                        logging.exception("Não consegui abrir a imagem colada")
+        return None                                # texto normal: cola como sempre
+
+    def _escolher_imagem(self):
+        """Botão 📎: escolher um arquivo de imagem do disco."""
+        caminho = filedialog.askopenfilename(
+            title="Escolher imagem",
+            filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.webp")],
+        )
+        if caminho:
+            try:
+                self._anexar_imagem(Image.open(caminho))
+            except OSError:
+                logging.exception("Não consegui abrir a imagem escolhida")
+
+    def _anexar_imagem(self, img):
+        """Prepara a imagem pro Ollama: encolhe, vira PNG, codifica em base64.
+
+        O encolhimento (teto ~1344px) importa: o modelo de visão trabalha
+        em resolução limitada de qualquer jeito, e imagem menor = pedido
+        mais leve e olhada mais rápida.
+        """
+        img = img.convert("RGB")
+        img.thumbnail((1344, 1344))                # reduz mantendo proporção
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        self.imagem_anexada = base64.b64encode(buffer.getvalue()).decode("ascii")
+        # mostra o chip logo acima da linha de digitação
+        self.linha_anexo.pack(fill="x", padx=16, pady=(0, 2))
+        logging.info("Imagem anexada (%d KB em base64)", len(self.imagem_anexada) // 1024)
+
+    def _remover_imagem(self):
+        self.imagem_anexada = ""
+        self.linha_anexo.pack_forget()
+
     def mostrar_memoria(self):
         """Bolha com os fatos REAIS do fatos.json — o gabarito da memória."""
         fatos = carregar_fatos()
@@ -275,11 +353,21 @@ class App(ctk.CTk):
 
     def enviar(self):
         texto = self.entrada.get().strip()
-        if not texto or self.bolha_pensando is not None:
-            return  # vazio, ou já estamos esperando uma resposta
+        if self.bolha_pensando is not None:
+            return  # já estamos esperando uma resposta
+        if not texto and not self.imagem_anexada:
+            return  # nada pra enviar
+        if not texto:
+            # só imagem, sem pergunta? Usa a pergunta padrão.
+            texto = "O que você vê nesta imagem?"
 
-        # 1) mostra sua fala e guarda no histórico
-        self._bolha(texto, autor="user")
+        # A imagem desta mensagem (se houver) — capturada AGORA e removida
+        # do campo: cada anexo vale pra UMA mensagem.
+        imagem = self.imagem_anexada
+        self._remover_imagem()
+
+        # 1) mostra sua fala e guarda no histórico (com marcador de imagem)
+        self._bolha(("🖼️ " if imagem else "") + texto, autor="user")
         self.mensagens.append({"role": "user", "content": texto})
         self.entrada.delete(0, "end")
 
@@ -296,10 +384,10 @@ class App(ctk.CTk):
         #    mensagem pode ir com um modo diferente.
         temperatura = MODOS[self.seletor_modo.get()]
         threading.Thread(
-            target=self._buscar_resposta, args=(temperatura,), daemon=True
+            target=self._buscar_resposta, args=(temperatura, imagem), daemon=True
         ).start()
 
-    def _buscar_resposta(self, temperatura):
+    def _buscar_resposta(self, temperatura, imagem=""):
         """Roda NA THREAD DE FUNDO. Daqui NÃO se mexe na tela direto."""
 
         def pinga_na_tela(pedaco):
@@ -317,7 +405,8 @@ class App(ctk.CTk):
                        ao_receber=pinga_na_tela, ao_buscar=avisa_busca,
                        # a fonte do turno passado volta pra mesa — é ela
                        # que torna o "continua" honesto em vez de inventado
-                       fonte_anterior=self.fonte_atual or None)
+                       fonte_anterior=self.fonte_atual or None,
+                       imagem=imagem or None)
             texto = r.texto
             if r.fonte:
                 self.fonte_atual = r.fonte   # pesquisa nova substitui a antiga
@@ -329,6 +418,8 @@ class App(ctk.CTk):
             if r.buscas:
                 # conta buscas E leituras de página — toda ida à web
                 detalhe += f" · 🔍 {r.buscas}× web"
+            if r.olhadas:
+                detalhe += f" · 👁️ {r.olhadas} olhada(s)"
         except CerebroError as erro:
             # Falha CONHECIDA (Ollama fechado, modelo faltando, timeout...):
             # o cérebro já mandou a mensagem pronta e amigável — só mostrar.
