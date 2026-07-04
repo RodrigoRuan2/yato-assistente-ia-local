@@ -29,7 +29,7 @@ fácil de entender e mudar sozinha:
 | `personalidade.py`  | O *system prompt*: quem o Yato é. **Edite à vontade.**     |
 | `cerebro.py`        | Falar com o Ollama + o ciclo do agente (pensa → busca → responde). |
 | `ferramentas.py`    | As "mãos": a busca na web que o Python executa quando o modelo pede. |
-| `memoria.py`        | Persistência: a conversa (`conversa.json`) e os fatos sobre você (`fatos.json`). |
+| `memoria.py`        | Persistência: o histórico de conversas (`conversas/`) e os fatos sobre você (`fatos.json`). |
 | `app.py`            | A janela (CustomTkinter). Só tela; pede pro `cerebro` pensar.|
 
 Essa divisão é de propósito: dá pra testar o `cerebro.py` sozinho (sem abrir a
@@ -181,16 +181,21 @@ Segurança da navegação (o que pensar antes de confiar):
 - **Privacidade**: o termo buscado sai da máquina (vai pro buscador), como
   numa aba de navegador. O cérebro continua 100% local.
 
-## Sua conversa fica salva
+## Histórico de conversas 📜
 
-Ao fechar e reabrir, o Yato **lembra da conversa**: cada troca é gravada em
-`conversa.json` (na pasta do projeto — abra e espie, é legível). Detalhes:
+O Yato guarda um **histórico das suas conversas** (como o do ChatGPT):
 
-- A **personalidade nunca é salva** — ela vem sempre fresca do
-  `personalidade.py`; o arquivo guarda só as falas.
-- Arquivo corrompido ou apagado? O app **não quebra**: começa do zero.
-- O botão **🧹 Nova conversa** apaga a memória da tela E do disco.
-- `conversa.json` está no `.gitignore`: conversa é dado pessoal, não código.
+- Cada conversa é um arquivo em `conversas/` (JSON legível — abra e espie).
+- O botão **📜 Histórico** lista as conversas salvas; clique em qualquer uma
+  pra reabrir e continuar de onde parou (a atual fica marcada `● atual`).
+- **🧹 Nova** começa uma conversa nova **sem apagar as anteriores** — elas
+  ficam no histórico.
+- Teto de **10 conversas**: ao criar a 11ª, a mais antiga é apagada
+  (rotação, igual ao `yato.log`).
+- A **personalidade nunca é salva** — vem sempre fresca do `personalidade.py`;
+  o arquivo guarda só as falas.
+- Arquivo corrompido? O app **não quebra**: ignora e segue.
+- `conversas/` está no `.gitignore`: conversa é dado pessoal, não código.
 
 ## O Yato enxerga 👁️
 
@@ -313,7 +318,16 @@ O projeto evolui em **rodadas** — cada uma vira um commit com nome claro.
       mandasse descrever também)
 - [ ] Evolução futura: tradutor de tela com tecla de atalho global
 
-### 📋 Rodada 7 — Voz 🎤
+### ✅ Rodada 7 — Histórico e janela única
+- [x] **Instância única**: abrir o Yato de novo não cria 2ª janela (avisa
+      "já está aberto" e sai) — protege os dados de duas janelas mexendo
+      no mesmo arquivo. Trava por porta local (à prova de crash, sem
+      trava-fantasma)
+- [x] **Histórico de conversas**: cada conversa num arquivo em `conversas/`,
+      botão 📜 pra listar e reabrir, teto de 10 (rotação da mais antiga),
+      migração automática do `conversa.json` antigo
+
+### 📋 Rodada 8 — Voz 🎤
 - [ ] Ouvir (Whisper local) e falar (Piper, voz pt-BR) — tudo offline
 
 ### 💡 Depois (sem número ainda)

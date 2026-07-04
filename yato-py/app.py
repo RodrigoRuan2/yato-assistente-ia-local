@@ -17,6 +17,8 @@ import base64
 import io
 import logging
 import re
+import socket
+import sys
 import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -27,7 +29,8 @@ from PIL import Image, ImageGrab
 
 from personalidade import PERSONALIDADE
 from cerebro import pensar, acordar, CerebroError, MODELO
-from memoria import salvar_conversa, carregar_conversa, carregar_fatos
+from memoria import (carregar_fatos, listar_conversas, novo_arquivo_conversa,
+                     salvar_conversa_em, carregar_falas_de, MAX_CONVERSAS)
 
 # ---- Os MODOS: nomes amigáveis pra temperatura ----
 # Temperatura é o "grau de ousadia" na escolha de cada palavra — mas um
@@ -92,9 +95,16 @@ class App(ctk.CTk):
 
         # ---- ESTADO: o histórico da conversa mora aqui ----
         # Personalidade sempre FRESCA (vem do código, nunca do disco) +
-        # as falas salvas da última sessão (vêm do conversa.json, se houver).
+        # as falas da conversa MAIS RECENTE do histórico (se houver).
+        # self.arquivo_conversa = onde a conversa atual é salva (None = nova,
+        # o arquivo nasce na primeira mensagem).
         self.mensagens = [{"role": "system", "content": PERSONALIDADE}]
-        self.mensagens += carregar_conversa()
+        historico = listar_conversas()
+        if historico:
+            self.arquivo_conversa = historico[0][0]
+            self.mensagens += carregar_falas_de(self.arquivo_conversa)
+        else:
+            self.arquivo_conversa = None
 
         self.bolha_pensando = None   # o balão da resposta em andamento
         self.rotulo_pensando = None  # o TEXTO dentro dele (atualiza no streaming)
@@ -122,10 +132,16 @@ class App(ctk.CTk):
         ).pack(side="left")
 
         ctk.CTkButton(
-            topo, text="🧹 Nova conversa", width=130,
+            topo, text="🧹 Nova", width=64,
             fg_color="transparent", border_width=1,
             command=self.nova_conversa,
         ).pack(side="right")
+
+        ctk.CTkButton(
+            topo, text="📜 Histórico", width=100,
+            fg_color="transparent", border_width=1,
+            command=self.mostrar_historico,
+        ).pack(side="right", padx=(0, 8))
 
         # Mostra a memória DIRETO do arquivo, sem passar pelo modelo:
         # perguntar "o que você sabe?" pro modelo rende enfeite (testado!);
@@ -194,7 +210,14 @@ class App(ctk.CTk):
         self.botao = ctk.CTkButton(baixo, text="Enviar", width=90, command=self.enviar)
         self.botao.pack(side="left", padx=(8, 0))
 
-        # Redesenha a conversa restaurada (se existir); senão, a dica padrão.
+        self._redesenhar_conversa()
+        self.entrada.focus()
+
+    def _redesenhar_conversa(self):
+        """Limpa a área e redesenha as bolhas a partir de self.mensagens.
+        Usado ao abrir o app E ao carregar uma conversa do histórico."""
+        for filho in self.area.winfo_children():
+            filho.destroy()
         falas = [m for m in self.mensagens if m["role"] != "system"]
         for m in falas:
             if m["role"] == "user":
@@ -205,7 +228,6 @@ class App(ctk.CTk):
             self._bolha("— conversa restaurada · 🧹 pra começar do zero —", autor="dica")
         else:
             self._bolha('Manda um "oi" pro Yato…', autor="dica")
-        self.entrada.focus()
 
     def _bolha(self, texto, autor, detalhe=None):
         """Desenha um balão. 'detalhe' é a linha de métricas (opcional)."""
@@ -338,18 +360,69 @@ class App(ctk.CTk):
             texto = "📌 Memória vazia — nenhum fato anotado ainda."
         self._bolha(texto, autor="dica")
 
+    def _salvar(self):
+        """Salva a conversa atual no disco. O arquivo nasce na 1ª mensagem."""
+        if self.arquivo_conversa is None:
+            self.arquivo_conversa = novo_arquivo_conversa()
+        salvar_conversa_em(self.arquivo_conversa, self.mensagens)
+
     def nova_conversa(self):
-        """Zera o papo: histórico volta ao começo (só a personalidade)."""
+        """Começa uma conversa NOVA — sem apagar as antigas (ficam no 📜).
+
+        A conversa atual já está salva no disco (salvamos a cada troca), então
+        aqui só trocamos de trilho: arquivo_conversa=None faz a próxima
+        mensagem nascer num arquivo novo.
+        """
         if self.bolha_pensando is not None:
             return  # esperando resposta — não puxar o tapete da thread
 
         self.mensagens = [{"role": "system", "content": PERSONALIDADE}]
-        self.fonte_atual = ""             # conversa nova = fonte antiga pro lixo
-        salvar_conversa(self.mensagens)   # apaga a conversa salva no disco também
+        self.fonte_atual = ""
+        self.arquivo_conversa = None   # a próxima fala cria um arquivo novo
         for filho in self.area.winfo_children():
             filho.destroy()   # limpa todas as bolhas da tela
-        self._bolha('Conversa nova, memória zerada. Manda um "oi"…', autor="dica")
+        self._bolha('Conversa nova. Manda um "oi"…', autor="dica")
         logging.info("Nova conversa iniciada")
+
+    def mostrar_historico(self):
+        """Janela com a lista das conversas salvas — clicar reabre a conversa."""
+        conversas = listar_conversas()
+        janela = ctk.CTkToplevel(self)
+        janela.title("Histórico de conversas")
+        janela.geometry("440x500")
+        janela.attributes("-topmost", True)
+
+        ctk.CTkLabel(
+            janela, text=f"📜 Últimas conversas (até {MAX_CONVERSAS})",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).pack(pady=12)
+
+        lista = ctk.CTkScrollableFrame(janela)
+        lista.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        if not conversas:
+            ctk.CTkLabel(lista, text="(nenhuma conversa salva ainda)",
+                         text_color="#8a8aa0").pack(pady=20)
+            return
+        for arquivo, titulo in conversas:
+            marca = "  ● atual" if arquivo == self.arquivo_conversa else ""
+            ctk.CTkButton(
+                lista, text=titulo + marca, anchor="w", height=36,
+                fg_color="#2a2a3a", hover_color="#3a3a4a",
+                command=lambda a=arquivo, j=janela: self._abrir_do_historico(a, j),
+            ).pack(fill="x", pady=3)
+
+    def _abrir_do_historico(self, arquivo, janela):
+        """Carrega uma conversa do histórico pra continuar de onde parou."""
+        if self.bolha_pensando is not None:
+            return  # esperando resposta — não troca de conversa no meio
+        janela.destroy()
+        self.arquivo_conversa = arquivo
+        self.mensagens = ([{"role": "system", "content": PERSONALIDADE}]
+                          + carregar_falas_de(arquivo))
+        self.fonte_atual = ""
+        self._redesenhar_conversa()
+        logging.info("Conversa carregada do histórico: %s", arquivo.name)
 
     def enviar(self):
         texto = self.entrada.get().strip()
@@ -469,13 +542,64 @@ class App(ctk.CTk):
         self.rotulo_pensando = None
 
         self.mensagens.append({"role": "assistant", "content": texto})
-        salvar_conversa(self.mensagens)   # cada troca completa vai pro disco
+        self._salvar()   # cada troca completa vai pro disco (na conversa atual)
         self.botao.configure(state="normal", text="Enviar")
         self._rolar_pro_fim()
         self.entrada.focus()
 
 
+# Porta local usada como "plaquinha de ocupado" — só pra marcar que há um
+# Yato aberto. Número alto e incomum pra não colidir com outros programas.
+PORTA_INSTANCIA = 49517
+
+
+def travar_instancia_unica():
+    """Impede uma SEGUNDA janela do Yato.
+
+    Como: tenta "pendurar uma plaquinha" numa porta local. Se conseguir, é
+    a única instância — devolve o socket (mantê-lo vivo = a trava dura toda
+    a vida do app). Se a porta já está ocupada, já existe um Yato aberto —
+    devolve None.
+
+    Por que porta e não arquivo de trava: quando o processo morre (fecha OU
+    trava/crasha), o Windows LIBERA a porta sozinho. Nunca sobra uma
+    "trava-fantasma" travando a próxima abertura — o pesadelo dos lock files.
+    """
+    trava = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        trava.bind(("127.0.0.1", PORTA_INSTANCIA))
+        trava.listen(1)
+        return trava
+    except OSError:
+        return None
+
+
+def avisar_ja_aberto():
+    """Janelinha de aviso que some sozinha — a 2ª instância mostra e sai.
+
+    Por que NÃO messagebox: messagebox + CustomTkinter trava invisível (o
+    processo fica pendurado sem mostrar nada — flagrado nos testes). Uma
+    janela CTk normal é confiável, e o auto-fechar evita processo preso.
+    """
+    aviso = ctk.CTk()
+    aviso.title("Yato")
+    aviso.geometry("320x120")
+    aviso.attributes("-topmost", True)   # aparece na frente de tudo
+    ctk.CTkLabel(
+        aviso, text="🐾 O Yato já está aberto!",
+        font=ctk.CTkFont(size=15, weight="bold"),
+    ).pack(expand=True, padx=20, pady=20)
+    aviso.after(2500, aviso.destroy)     # some sozinha após 2,5s
+    aviso.mainloop()
+
+
 if __name__ == "__main__":
+    _trava = travar_instancia_unica()
+    if _trava is None:
+        # Já tem um Yato aberto: avisa e sai, sem abrir segunda janela.
+        avisar_ja_aberto()
+        sys.exit(0)
+
     logging.info("Yato abriu (modelo: %s)", MODELO)
     App().mainloop()
     logging.info("Yato fechou")

@@ -14,56 +14,125 @@ Regras de ouro de persistência (valem pra qualquer projeto):
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
-# A conversa fica ao lado do código, em JSON legível (abra e olhe!).
-# Este arquivo está no .gitignore: conversa é dado pessoal, não código.
-ARQUIVO_CONVERSA = Path(__file__).with_name("conversa.json")
+# ===========================================================================
+#  HISTÓRICO DE CONVERSAS — cada conversa é um arquivo em conversas/.
+#
+#  Antes era UM conversa.json (o 🧹 apagava a anterior pra sempre). Agora
+#  cada conversa vira um arquivo com timestamp no nome, e guardamos as N
+#  mais recentes — um histórico navegável, como o do ChatGPT. Ao passar do
+#  teto, a MAIS ANTIGA é apagada (rotação, igual ao yato.log).
+#  Tudo no .gitignore: conversa é dado pessoal, não código.
+# ===========================================================================
+
+PASTA_CONVERSAS = Path(__file__).with_name("conversas")
+MAX_CONVERSAS = 10
+_CONVERSA_ANTIGA = Path(__file__).with_name("conversa.json")  # formato v1, p/ migrar
 
 
-def salvar_conversa(mensagens):
-    """Grava a conversa em disco — SEM a personalidade.
+def _garantir_pasta():
+    PASTA_CONVERSAS.mkdir(exist_ok=True)
 
-    Por que sem? A personalidade mora no personalidade.py (código). Se ela
-    fosse salva junto e você editasse o arquivo depois, a Yato "antiga"
-    voltaria do disco. Salvando só as falas, a personalidade atual sempre
-    vale. (Princípio: cada dado tem UM dono — nada de cópias.)
+
+def _so_falas(itens):
+    """Mantém só falas válidas de user/assistant (a personalidade mora no
+    código, nunca no disco — se fosse salva, uma "Yato antiga" voltaria)."""
+    if not isinstance(itens, list):
+        return []
+    return [m for m in itens
+            if isinstance(m, dict) and m.get("role") in ("user", "assistant")
+            and isinstance(m.get("content"), str)]
+
+
+def _titulo(falas):
+    """Título da conversa = a 1ª fala do usuário, curtinha (pro histórico)."""
+    for m in falas:
+        if m["role"] == "user":
+            t = " ".join(m["content"].split())
+            return (t[:38] + "…") if len(t) > 38 else t
+    return "(conversa vazia)"
+
+
+def _rotacionar():
+    """Abre espaço pra uma conversa nova apagando as mais antigas além do teto."""
+    arqs = sorted(PASTA_CONVERSAS.glob("*.json"), key=lambda a: a.stat().st_mtime)
+    while len(arqs) >= MAX_CONVERSAS:
+        try:
+            arqs.pop(0).unlink()
+        except OSError:
+            break
+
+
+def novo_arquivo_conversa():
+    """Caminho de uma conversa NOVA (nome = timestamp) + aplica a rotação.
+
+    O %f (microssegundos) evita colisão de nome se duas conversas nascerem
+    no mesmo segundo — senão a segunda sobrescreveria a primeira (pego no teste).
     """
-    falas = [m for m in mensagens if m["role"] != "system"]
+    _garantir_pasta()
+    _rotacionar()
+    return PASTA_CONVERSAS / (datetime.now().strftime("%Y%m%d-%H%M%S-%f") + ".json")
+
+
+def salvar_conversa_em(arquivo, mensagens):
+    """Grava as falas (sem a personalidade) num arquivo de conversa + título.
+
+    Leitura segura na escrita: se o disco falhar, anota no diário e segue —
+    perder um "salvar" é chato, derrubar o app por isso seria pior.
+    """
+    falas = _so_falas(mensagens)
+    if not falas:
+        return   # conversa ainda vazia: nada pra gravar
     try:
-        ARQUIVO_CONVERSA.write_text(
-            json.dumps(falas, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        Path(arquivo).write_text(
+            json.dumps({"titulo": _titulo(falas), "mensagens": falas},
+                       ensure_ascii=False, indent=2),
+            encoding="utf-8")
     except OSError:
-        # Disco cheio, sem permissão... anota no diário e segue o baile:
-        # perder o "salvar" é chato; derrubar o app por isso seria pior.
         logging.exception("Não consegui salvar a conversa")
 
 
-def carregar_conversa():
-    """Lê a conversa salva. QUALQUER problema → lista vazia (nunca quebra).
-
-    Este é o padrão 'leitura segura': try/except em volta do parse, e
-    validação item a item — se alguém editou o JSON na mão e estragou uma
-    fala, as outras ainda são aproveitadas.
-    """
+def carregar_falas_de(arquivo):
+    """Lê as falas de um arquivo de conversa. Qualquer problema → lista vazia."""
     try:
-        dados = json.loads(ARQUIVO_CONVERSA.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return []          # primeira vez que o app roda: normal não existir
-    except (OSError, json.JSONDecodeError):
-        logging.exception("conversa.json ilegível — começando do zero")
+        dados = json.loads(Path(arquivo).read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
         return []
+    # aceita o formato novo ({"mensagens": [...]}) e o v1 (lista direta)
+    return _so_falas(dados.get("mensagens") if isinstance(dados, dict) else dados)
 
-    if not isinstance(dados, list):
-        return []
-    return [
-        m for m in dados
-        if isinstance(m, dict)
-        and m.get("role") in ("user", "assistant")
-        and isinstance(m.get("content"), str)
-    ]
+
+def _migrar_conversa_antiga():
+    """Importa o conversa.json v1 (se existir) como uma conversa da pasta nova,
+    pra não perder o que o usuário já tinha. Roda uma vez e some com o v1."""
+    if not _CONVERSA_ANTIGA.exists():
+        return
+    try:
+        falas = carregar_falas_de(_CONVERSA_ANTIGA)
+        if falas:
+            salvar_conversa_em(novo_arquivo_conversa(), falas)
+        _CONVERSA_ANTIGA.unlink()
+    except OSError:
+        pass
+
+
+def listar_conversas():
+    """Todas as conversas salvas: lista de (arquivo, título), da + recente."""
+    _migrar_conversa_antiga()
+    _garantir_pasta()
+    itens = []
+    for arq in PASTA_CONVERSAS.glob("*.json"):
+        try:
+            dados = json.loads(arq.read_text(encoding="utf-8"))
+            titulo = (dados.get("titulo") if isinstance(dados, dict) else None) \
+                or "(sem título)"
+        except (OSError, json.JSONDecodeError):
+            continue
+        itens.append((arq, titulo, arq.stat().st_mtime))
+    itens.sort(key=lambda x: x[2], reverse=True)
+    return [(arq, titulo) for arq, titulo, _ in itens]
 
 
 # ===========================================================================
