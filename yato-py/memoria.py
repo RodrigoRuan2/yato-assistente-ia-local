@@ -85,13 +85,53 @@ def salvar_conversa_em(arquivo, mensagens):
     falas = _so_falas(mensagens)
     if not falas:
         return   # conversa ainda vazia: nada pra gravar
+    arquivo = Path(arquivo)
+
+    # Título: normalmente vem da 1ª fala. MAS se o usuário renomeou a mão
+    # (titulo_manual), preservamos — senão o salvamento seguinte apagaria o
+    # nome que ele escolheu.
+    titulo, manual = _titulo(falas), False
+    if arquivo.exists():
+        try:
+            antigo = json.loads(arquivo.read_text(encoding="utf-8"))
+            if isinstance(antigo, dict) and antigo.get("titulo_manual"):
+                titulo, manual = antigo.get("titulo", titulo), True
+        except (OSError, json.JSONDecodeError):
+            pass
     try:
-        Path(arquivo).write_text(
-            json.dumps({"titulo": _titulo(falas), "mensagens": falas},
-                       ensure_ascii=False, indent=2),
+        arquivo.write_text(
+            json.dumps({"titulo": titulo, "titulo_manual": manual,
+                        "mensagens": falas}, ensure_ascii=False, indent=2),
             encoding="utf-8")
     except OSError:
         logging.exception("Não consegui salvar a conversa")
+
+
+def renomear_conversa(arquivo, novo_titulo):
+    """Renomeia uma conversa (marca titulo_manual pra não ser sobrescrito)."""
+    novo_titulo = " ".join(str(novo_titulo).split())[:60]
+    if not novo_titulo:
+        return
+    arquivo = Path(arquivo)
+    try:
+        dados = json.loads(arquivo.read_text(encoding="utf-8"))
+        if not isinstance(dados, dict):
+            dados = {"mensagens": _so_falas(dados)}
+        dados["titulo"] = novo_titulo
+        dados["titulo_manual"] = True
+        arquivo.write_text(json.dumps(dados, ensure_ascii=False, indent=2),
+                           encoding="utf-8")
+    except (OSError, json.JSONDecodeError):
+        logging.exception("Não consegui renomear a conversa")
+
+
+def excluir_conversa(arquivo):
+    """Apaga o arquivo de uma conversa. Devolve True se conseguiu."""
+    try:
+        Path(arquivo).unlink()
+        return True
+    except OSError:
+        return False
 
 
 def carregar_falas_de(arquivo):

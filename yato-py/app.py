@@ -30,7 +30,8 @@ from PIL import Image, ImageGrab
 from personalidade import PERSONALIDADE
 from cerebro import pensar, acordar, CerebroError, MODELO
 from memoria import (carregar_fatos, listar_conversas, novo_arquivo_conversa,
-                     salvar_conversa_em, carregar_falas_de, MAX_CONVERSAS)
+                     salvar_conversa_em, carregar_falas_de,
+                     renomear_conversa, excluir_conversa)
 
 # ---- Os MODOS: nomes amigáveis pra temperatura ----
 # Temperatura é o "grau de ousadia" na escolha de cada palavra — mas um
@@ -131,10 +132,12 @@ class App(ctk.CTk):
             command=self.nova_conversa,
         ).pack(side="right")
 
+        # O botão 📜 agora abre/fecha um PAINEL LATERAL embutido (não mais
+        # uma janela extra) — e por ser embutido ele se atualiza sozinho.
         ctk.CTkButton(
             topo, text="📜 Histórico", width=100,
             fg_color="transparent", border_width=1,
-            command=self.mostrar_historico,
+            command=self.toggle_painel,
         ).pack(side="right", padx=(0, 8))
 
         # Mostra a memória DIRETO do arquivo, sem passar pelo modelo:
@@ -151,12 +154,31 @@ class App(ctk.CTk):
         self.status = ctk.CTkLabel(topo, text="● acordando…", text_color="#f1c40f")
         self.status.pack(side="right", padx=(0, 10))
 
+        # ---- Corpo: painel lateral (recolhível) + área principal ----
+        corpo = ctk.CTkFrame(self, fg_color="transparent")
+        corpo.pack(fill="both", expand=True)
+
+        # O painel do histórico começa RECOLHIDO (não empacotado). Largura
+        # fixa; pack_propagate(False) impede os filhos de "esticarem" ele.
+        self.painel = ctk.CTkFrame(corpo, width=215)
+        self.painel.pack_propagate(False)
+        self.painel_visivel = False
+        ctk.CTkLabel(self.painel, text="📜 Conversas",
+                     font=ctk.CTkFont(size=13, weight="bold")).pack(pady=(10, 4))
+        self.lista_conversas = ctk.CTkScrollableFrame(
+            self.painel, fg_color="transparent")
+        self.lista_conversas.pack(fill="both", expand=True, padx=6, pady=(0, 8))
+
+        # A área principal (tudo o que já existia) fica À DIREITA do painel.
+        self.principal = ctk.CTkFrame(corpo, fg_color="transparent")
+        self.principal.pack(side="left", fill="both", expand=True)
+
         # Área das mensagens: um quadro que ROLA sozinho quando enche.
-        self.area = ctk.CTkScrollableFrame(self)
+        self.area = ctk.CTkScrollableFrame(self.principal)
         self.area.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
         # ---- O seletor de MODO (a temperatura com nome de gente) ----
-        linha_modo = ctk.CTkFrame(self, fg_color="transparent")
+        linha_modo = ctk.CTkFrame(self.principal, fg_color="transparent")
         linha_modo.pack(fill="x", padx=14, pady=(0, 4))
 
         ctk.CTkLabel(linha_modo, text="Modo:", font=ctk.CTkFont(size=12)).pack(side="left")
@@ -176,7 +198,7 @@ class App(ctk.CTk):
         self.rotulo_dica.pack(side="left")
 
         # O "chip" da imagem anexada — só aparece quando tem imagem.
-        self.linha_anexo = ctk.CTkFrame(self, fg_color="transparent")
+        self.linha_anexo = ctk.CTkFrame(self.principal, fg_color="transparent")
         self.chip_anexo = ctk.CTkLabel(
             self.linha_anexo, text="🖼️ imagem anexada — clique pra remover",
             text_color="#8ab4f8", cursor="hand2", font=ctk.CTkFont(size=11),
@@ -185,7 +207,7 @@ class App(ctk.CTk):
         self.chip_anexo.pack(side="left")
 
         # Linha de baixo: anexar + campo de digitar + botão enviar.
-        baixo = ctk.CTkFrame(self, fg_color="transparent")
+        baixo = ctk.CTkFrame(self.principal, fg_color="transparent")
         baixo.pack(fill="x", padx=12, pady=(0, 12))
 
         ctk.CTkButton(
@@ -376,47 +398,84 @@ class App(ctk.CTk):
         for filho in self.area.winfo_children():
             filho.destroy()   # limpa todas as bolhas da tela
         self._bolha('Conversa nova. Manda um "oi"…', autor="dica")
+        self._atualizar_lista_conversas()   # tira o "● atual" da lista
         logging.info("Nova conversa iniciada")
 
-    def mostrar_historico(self):
-        """Janela com a lista das conversas salvas — clicar reabre a conversa."""
+    def toggle_painel(self):
+        """Abre/recolhe o painel lateral de conversas (embutido na janela)."""
+        if self.painel_visivel:
+            self.painel.pack_forget()
+            self.painel_visivel = False
+        else:
+            self.painel.pack(side="left", fill="y", padx=(8, 0), pady=(0, 12),
+                             before=self.principal)
+            self.painel_visivel = True
+            self._atualizar_lista_conversas()
+
+    def _atualizar_lista_conversas(self):
+        """Recria a lista no painel — chamada sempre que as conversas mudam.
+        (Como o painel é embutido, isso resolve o antigo bug do histórico
+        que não atualizava sozinho.)"""
+        if not self.painel_visivel:
+            return
+        for w in self.lista_conversas.winfo_children():
+            w.destroy()
         conversas = listar_conversas()
-        janela = ctk.CTkToplevel(self)
-        janela.title("Histórico de conversas")
-        janela.geometry("440x500")
-        janela.attributes("-topmost", True)
-
-        ctk.CTkLabel(
-            janela, text=f"📜 Últimas conversas (até {MAX_CONVERSAS})",
-            font=ctk.CTkFont(size=15, weight="bold"),
-        ).pack(pady=12)
-
-        lista = ctk.CTkScrollableFrame(janela)
-        lista.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-
         if not conversas:
-            ctk.CTkLabel(lista, text="(nenhuma conversa salva ainda)",
-                         text_color="#8a8aa0").pack(pady=20)
+            ctk.CTkLabel(self.lista_conversas, text="(nenhuma ainda)",
+                         text_color="#8a8aa0").pack(pady=12)
             return
         for arquivo, titulo in conversas:
-            marca = "  ● atual" if arquivo == self.arquivo_conversa else ""
+            atual = arquivo == self.arquivo_conversa
+            item = ctk.CTkFrame(self.lista_conversas,
+                                fg_color="#3a3a4a" if atual else "#242430")
+            item.pack(fill="x", pady=2)
             ctk.CTkButton(
-                lista, text=titulo + marca, anchor="w", height=36,
-                fg_color="#2a2a3a", hover_color="#3a3a4a",
-                command=lambda a=arquivo, j=janela: self._abrir_do_historico(a, j),
-            ).pack(fill="x", pady=3)
+                item, text=("● " if atual else "") + titulo, anchor="w",
+                fg_color="transparent", hover_color="#4a4a5a", height=30,
+                command=lambda a=arquivo: self._abrir_conversa(a),
+            ).pack(side="left", fill="x", expand=True)
+            ctk.CTkButton(
+                item, text="✏️", width=26, fg_color="transparent",
+                hover_color="#4a4a5a",
+                command=lambda a=arquivo: self._renomear_conversa(a),
+            ).pack(side="left")
+            ctk.CTkButton(
+                item, text="🗑️", width=26, fg_color="transparent",
+                hover_color="#7a2a2a",
+                command=lambda a=arquivo: self._excluir_conversa(a),
+            ).pack(side="left")
 
-    def _abrir_do_historico(self, arquivo, janela):
-        """Carrega uma conversa do histórico pra continuar de onde parou."""
+    def _abrir_conversa(self, arquivo):
+        """Carrega uma conversa do painel pra continuar de onde parou."""
         if self.bolha_pensando is not None:
-            return  # esperando resposta — não troca de conversa no meio
-        janela.destroy()
+            return  # esperando resposta — não troca no meio
         self.arquivo_conversa = arquivo
         self.mensagens = ([{"role": "system", "content": PERSONALIDADE}]
                           + carregar_falas_de(arquivo))
         self.fonte_atual = ""
         self._redesenhar_conversa()
-        logging.info("Conversa carregada do histórico: %s", arquivo.name)
+        self._atualizar_lista_conversas()   # atualiza o marcador "● atual"
+        logging.info("Conversa aberta do painel: %s", arquivo.name)
+
+    def _renomear_conversa(self, arquivo):
+        """Pergunta um nome novo (input pequeno) e renomeia a conversa."""
+        dialog = ctk.CTkInputDialog(text="Novo nome da conversa:", title="Renomear")
+        novo = dialog.get_input()   # None se cancelar
+        if novo:
+            renomear_conversa(arquivo, novo)
+            self._atualizar_lista_conversas()
+
+    def _excluir_conversa(self, arquivo):
+        """Apaga uma conversa do histórico. Se for a atual, começa uma nova."""
+        excluir_conversa(arquivo)
+        if arquivo == self.arquivo_conversa:
+            self.arquivo_conversa = None
+            self.mensagens = [{"role": "system", "content": PERSONALIDADE}]
+            self.fonte_atual = ""
+            self._redesenhar_conversa()
+        self._atualizar_lista_conversas()
+        logging.info("Conversa excluída: %s", arquivo.name)
 
     def enviar(self):
         texto = self.entrada.get().strip()
@@ -537,6 +596,7 @@ class App(ctk.CTk):
 
         self.mensagens.append({"role": "assistant", "content": texto})
         self._salvar()   # cada troca completa vai pro disco (na conversa atual)
+        self._atualizar_lista_conversas()   # a conversa nova/atualizada aparece no painel
         self.botao.configure(state="normal", text="Enviar")
         self._rolar_pro_fim()
         self.entrada.focus()

@@ -186,10 +186,12 @@ Segurança da navegação (o que pensar antes de confiar):
 O Yato guarda um **histórico das suas conversas** (como o do ChatGPT):
 
 - Cada conversa é um arquivo em `conversas/` (JSON legível — abra e espie).
-- O botão **📜 Histórico** lista as conversas salvas; clique em qualquer uma
-  pra reabrir e continuar de onde parou (a atual fica marcada `● atual`).
+- O botão **📜 Histórico** abre um **painel lateral embutido** (não uma
+  janela separada) com as conversas salvas: clique numa pra reabrir, ✏️ pra
+  renomear, 🗑️ pra excluir. A atual fica marcada com `●`. Por ser embutido,
+  a lista se atualiza sozinha quando você cria/troca de conversa.
 - **🧹 Nova** começa uma conversa nova **sem apagar as anteriores** — elas
-  ficam no histórico.
+  ficam no histórico. E o app **abre sempre numa conversa nova**.
 - Teto de **10 conversas**: ao criar a 11ª, a mais antiga é apagada
   (rotação, igual ao `yato.log`).
 - A **personalidade nunca é salva** — vem sempre fresca do `personalidade.py`;
