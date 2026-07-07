@@ -40,19 +40,41 @@ fácil de entender e mudar sozinha:
 Essa divisão é de propósito: dá pra testar o `cerebro.py` sozinho (sem abrir a
 janela) e, no futuro, trocar o Ollama por outra coisa mexendo só num lugar.
 
-## O que você precisa (uma vez só)
+## Instalação do zero (máquina nova)
 
-1. **Python 3.12+** (já tem) e o **Ollama** instalado e aberto.
-2. O modelo baixado:
-   ```bash
-   ollama pull qwen2.5:7b
+O repositório traz só o **código** — os "ingredientes pesados" (bibliotecas,
+voz, cérebro) você baixa uma vez. Tem um **atalho que faz quase tudo**:
+
+1. Instale o **Python 3.12+** e o **Ollama** ([ollama.com/download](https://ollama.com/download)).
+2. Na pasta `yato-py/`, rode o preparador:
+   ```powershell
+   python preparar.py
    ```
+   Ele **cria o `.venv`, instala as bibliotecas, baixa a voz do Piper (~60 MB)
+   e puxa o modelo do Ollama (~4,7 GB)** — só o Ollama precisa estar instalado,
+   o resto é automático. Pode rodar de novo quando quiser: ele **pula o que já
+   ficou pronto**.
+3. Abra o Yato: duplo-clique em **`Iniciar Yato.bat`**.
 
-## Como rodar
+Quer entender **cada passo na mão** (ou o `preparar.py` falhou)? A versão manual:
+
+1. **Ollama** aberto + o modelo (o "cérebro"): `ollama pull qwen2.5:7b`
+2. Ambiente virtual + bibliotecas:
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   ```
+3. A **voz**: baixe `pt_BR-faber-medium.onnx` **e** o `.onnx.json` de
+   [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/main/pt/pt_BR/faber/medium)
+   e ponha os dois em `vozes/`.
+4. O **avatar** puxa o Live2D da internet na 1ª vez (precisa de rede).
+
+## Como rodar (dia a dia)
 
 O projeto usa um **ambiente virtual** (`.venv`): uma "caixa" isolada com as
-bibliotecas do projeto, pra não misturar com o Python do sistema. As libs já
-foram instaladas nele. Pra rodar:
+bibliotecas do projeto, pra não misturar com o Python do sistema. Depois de
+instalado, pra abrir é só o **`Iniciar Yato.bat`** — ou, no terminal:
 
 ```powershell
 # 1) ativa o ambiente virtual (uma vez por terminal aberto)
