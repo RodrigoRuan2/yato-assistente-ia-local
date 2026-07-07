@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yato — Avatar</title>
+  <link rel="stylesheet" href="estilo.css">
+
+  <!-- As 3 bibliotecas do Live2D (por enquanto do CDN; depois viram locais):
+       1) o runtime OFICIAL da Live2D (Cubism 4) — quem entende o modelo;
+       2) PIXI.js 6.5.2 — o motor de desenho 2D (a v6 é a que o renderizador
+          exige; a v7+ tem outra API e quebra);
+       3) pixi-live2d-display 0.4.0, bundle "cubism4" — a cola Live2D↔PIXI.
+          VERSÕES PINADAS de propósito: o "latest" do CDN servia um bundle que
+          NÃO expunha a classe Live2DModel (só um 'config' vazio). A 0.4.0
+          funciona. Não troque por @latest sem testar. -->
+  <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.2/dist/browser/pixi.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+</head>
+<body>
+  <!-- Menu de exploração: troque de modelo pra achar o que combina com o Yato -->
+  <select id="seletor" title="Escolha um modelo pra ver"></select>
+
+  <!-- Fechar o mascote (só funciona na janela sem-moldura; no navegador é
+       inerte, mas não atrapalha). -->
+  <button id="fechar" title="Fechar (ESC)">✕</button>
+
+  <!-- O "palco" onde o personagem é desenhado. A classe pywebview-drag-region
+       faz ARRASTAR O PERSONAGEM mover a janela toda (comportamento de mascote). -->
+  <canvas id="palco" class="pywebview-drag-region"></canvas>
+
+  <!-- Nossa lógica: carregar e controlar o avatar -->
+  <script src="avatar.js"></script>
+</body>
+</html>

@@ -20,6 +20,7 @@ cerebro.py  ──HTTP──►  Ollama em http://localhost:11434  ──►  mo
 personalidade.py  (o texto que diz QUEM o Yato é)
 memoria.py        (salvar/carregar a conversa no disco)
 voz.py            (fala as respostas em voz alta — Piper, offline)
+avatar2d.py  ──HTTP──►  avatar_app.py  (janela Live2D flutuante, processo à parte)
 ```
 
 Cada arquivo tem uma responsabilidade separada — assim cada parte é
@@ -33,6 +34,8 @@ fácil de entender e mudar sozinha:
 | `memoria.py`        | Persistência: o histórico de conversas (`conversas/`) e os fatos sobre você (`fatos.json`). |
 | `app.py`            | A janela (CustomTkinter). Só tela; pede pro `cerebro` pensar.|
 | `voz.py`            | A voz: transforma a resposta em áudio (Piper) e toca — offline. |
+| `avatar2d.py`       | O "controle remoto" do avatar: abre/fecha a janela e manda os comandos (boca, expressão). |
+| `avatar_app.py`     | A janela flutuante do avatar Live2D (roda num **processo à parte**). |
 
 Essa divisão é de propósito: dá pra testar o `cerebro.py` sozinho (sem abrir a
 janela) e, no futuro, trocar o Ollama por outra coisa mexendo só num lugar.
@@ -274,14 +277,35 @@ modelo do Ollama). Pra ter voz, baixe o `pt_BR-faber-medium` do repositório
 (`pt_BR-faber-medium.onnx` e `.onnx.json`) — e ponha em `vozes/`. Sem eles, o
 botão avisa e o resto do app funciona normal.
 
-### O modo Avatar 🎭 (preparando o terreno)
+## O avatar 2D flutuante (Live2D) 🎭
 
-O topo tem um seletor **Chat ↔ Avatar**. No modo Avatar, o Yato ganha um
-palco central e um indicador de expressão que **acompanha a voz**: enquanto
-ele fala, o estado fica `falando` pelo **tempo exato do áudio** — a base do
-*lip-sync*. Hoje é uma imagem estática (PNGTuber simples); o `avatar2d.py`
-guarda o **plano do avatar Live2D** numa janela flutuante (o "chefão" da
-próxima rodada). O motor de estados já está pronto pra recebê-lo.
+O topo tem um seletor **💬 Chat ↔ 🎭 Avatar**. No modo Avatar, um personagem
+**Live2D** (que respira, pisca e **mexe a boca junto com a voz**) aparece numa
+**janela flutuante** por cima da tela — estilo VTuber/mascote de desktop. Com
+a **voz ligada (🔊)**, o Yato responde e o avatar **fala em lip-sync de verdade**.
+
+Como funciona por dentro (a parte honesta):
+
+- **Live2D roda na web** (o SDK Cubism é JavaScript). Então o avatar é uma
+  página HTML (`avatar/`) que desenha o modelo com `pixi-live2d-display`,
+  aberta numa janela `pywebview`. Aqui o projeto **deixa de ser 100% Python** —
+  troca consciente pra ter um avatar de verdade. Ainda roda **local**.
+- **Processo à parte:** o `pywebview` e o Tkinter brigam pela *main thread*,
+  então o avatar (`avatar_app.py`) roda **separado**; o Yato conversa com ele
+  por uma ponte HTTP local (`avatar2d.py` → porta 8137).
+- **Lip-sync:** o `voz.py` mede a *força do som* da fala em janelas de ~55ms
+  e manda pro avatar no ritmo — a boca abre nas sílabas, fecha nas pausas.
+  Cada modelo declara seu parâmetro de boca (Natori usa `ParamMouthOpenY`,
+  a Mao usa `ParamA`); o código lê o grupo `LipSync` de cada um.
+- **Transparência:** o WebView2 no Windows 11 não compõe fundo transparente
+  (dá branco), então o avatar fica num **card justo** ao personagem, opaco —
+  e o mouse nunca buga.
+- **Modelos de teste:** por enquanto usa modelos de exemplo da Live2D (Natori,
+  Mao) — são **manequins**; o Yato riggado entra no lugar no futuro. As libs e
+  os modelos vêm de **CDN** (precisa de internet na 1ª vez; um passo futuro é
+  baixar tudo pra local).
+
+Rodar o avatar sozinho, sem o Yato: o atalho **`Testar Avatar.bat`**.
 
 ## Se algo der errado
 
@@ -375,11 +399,21 @@ O projeto evolui em **rodadas** — cada uma vira um commit com nome claro.
 - [x] Esqueleto `avatar2d.py`: o plano do avatar Live2D em janela flutuante
 - [ ] **Ouvir** (Whisper local) — a outra metade da voz, pra uma próxima rodada
 
-### 📋 Rodada 9 — Avatar 2D (Live2D) 🎭
-- [ ] Riggar o Yato: a arte em camadas (cabelo, olhos, boca...) no Live2D Cubism
-- [ ] Janela flutuante (`pywebview`) renderizando o modelo (`pixi-live2d-display`)
-- [ ] Lip-sync de verdade: a boca acompanha a força do áudio da voz
-- [ ] Ponte com o motor de expressões que a Rodada 8 já deixou pronto
+### ✅ Rodada 9 — Avatar 2D flutuante (Live2D) 🎭
+- [x] Janela flutuante (`pywebview`) renderizando Live2D (`pixi-live2d-display`
+      + PIXI 6 + Cubism Core), num **processo à parte** (evita a briga de
+      main thread com o Tkinter)
+- [x] Ponte HTTP local (`avatar2d.py` → `avatar_app.py`): o Yato abre/fecha a
+      janela e manda comandos (boca, expressão)
+- [x] **Lip-sync de verdade**: o `voz.py` mede a força do som e a boca segue
+      o áudio (lê o grupo `LipSync` de cada modelo — Natori/Mao usam nomes
+      diferentes de parâmetro)
+- [x] Enquadramento tipo VTuber (zoom no busto) + card justo (a transparência
+      não rola no WebView2/Win11) + mascote sem-moldura, arrastável, com ✕/ESC
+- [x] Integrado ao toggle **Chat/Avatar** (o palco de imagem estática se aposentou)
+- [ ] Baixar libs + modelo pra local (voltar a ser offline de verdade)
+- [ ] O grande final: **riggar o próprio Yato** (arte em camadas no Live2D Cubism)
+      pra ele entrar no lugar dos modelos de teste (Natori/Mao)
 
 ### 💡 Depois (sem número ainda)
 - [ ] Mais ferramentas (clima, lembretes, ler arquivos...)

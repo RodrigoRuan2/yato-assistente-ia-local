@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "yato-mini"],
       "port": 5173
+    },
+    {
+      "name": "avatar",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8123", "--directory", "yato-py/avatar"],
+      "port": 8123
     }
   ]
 }

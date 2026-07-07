@@ -1,100 +1,92 @@
 """
-O AVATAR 2D — Live2D numa janela flutuante (o "chefão", ainda POR CONSTRUIR).
+O AVATAR 2D — o LADO YATO da conversa com o avatar Live2D flutuante.
 
-╔════════════════════════════════════════════════════════════════════════╗
-║  ESTE ARQUIVO É UM ESQUELETO / PLANO — NADA AQUI FUNCIONA AINDA.        ║
-║  Ninguém importa este módulo por enquanto (app.py não depende dele),    ║
-║  então ele não quebra o Yato. É o rascunho pra quando a gente encarar   ║
-║  o avatar de verdade.                                                    ║
-╚════════════════════════════════════════════════════════════════════════╝
+O avatar roda num PROCESSO separado (avatar_app.py), porque o pywebview (a
+janela) e o Tkinter (a janela do Yato) brigam pela 'main thread'. Este módulo
+é o "controle remoto" que o Yato usa:
 
-A VISÃO
--------
-Um personagem Live2D (que respira, pisca e mexe a boca) numa janelinha
-própria, por cima da tela — estilo VTuber / mascote de desktop. Ele "fica
-fora" da janela do chat e reage ao Yato: pensa quando o Yato pensa, fala
-(boca mexendo) quando o Yato fala.
+  • mostrar()/esconder()      → abre e fecha a janela flutuante (subprocess);
+  • definir_expressao(nome)   → troca a expressão (ociosa/pensando/falando…);
+  • lip_sync(forca)           → move a boca conforme a força do som (0..1).
 
-POR QUE ISSO É O "CHEFÃO" (a parte honesta)
--------------------------------------------
-Live2D não tem um bom renderizador em Python puro. O jeito consolidado é
-WEB: o SDK Cubism roda em JavaScript. Então o plano realista é:
-
-  1. Uma página HTML local desenha o modelo Live2D com a lib JS
-     `pixi-live2d-display` (em cima do PIXI.js).
-  2. O Python abre essa página numa JANELA FLUTUANTE usando `pywebview`
-     (uma janela de navegador enxuta, sem barra, sempre-no-topo).
-  3. Python ↔ JavaScript conversam: o Python manda "expressão = falando"
-     e a página aplica no modelo.
-
-Ou seja: aqui o projeto deixa de ser "100% Python sem web". É uma escolha
-consciente — o resultado (um avatar de verdade) vale o custo. Enquanto isso
-não existe, o modo Avatar usa o PNGTuber de imagens (reserva) que já temos.
-
-O QUE PRECISA (quando for a hora)
----------------------------------
-  • Um modelo Live2D (.model3.json + texturas + physics). Fontes: a loja
-    oficial da Live2D, ou modelos gratuitos "for personal use". (O nosso
-    Yato hoje é uma imagem única — pra Live2D ele precisaria ser RIGGADO,
-    separado em camadas: cabelo, olhos, boca… Isso é um trabalho de arte à
-    parte, feito em softwares como o Live2D Cubism.)
-  • pip install pywebview            (a janela flutuante)
-  • pixi-live2d-display + pixi.js    (no lado da página HTML)
-  • Cubism Core (runtime oficial da Live2D pra web)
-
-O CONTRATO (o que o app.py vai chamar)
---------------------------------------
-O motor de estados JÁ existe no app: _expressao(nome) é disparado com
-'ociosa' | 'pensando' | 'falando' | 'feliz', cravado no tempo da voz. Este
-módulo só precisa expor as funções abaixo e reagir a esses estados.
+Os comandos viajam pela PONTE HTTP local que o avatar_app expõe na porta 8137
+(ex.: /controle?acao=boca&valor=0.8). Se a janela está fechada, tudo é
+silenciosamente ignorado — o Yato nunca quebra por causa do avatar.
 """
 
 import logging
+import subprocess
+import sys
+import threading
+import urllib.request
+from pathlib import Path
 
-# Estados que o avatar entende — os MESMOS que o app.py já usa em _expressao().
-# Manter em sincronia com IMAGENS_EXPRESSAO lá. Cada um vira uma expressão/motion
-# Live2D (ou, no lip-sync, o estado 'falando' liga a boca).
+PORTA = 8137
+_URL = f"http://127.0.0.1:{PORTA}/controle"
+_SCRIPT = Path(__file__).with_name("avatar_app.py")
+_PASTA_WEB = Path(__file__).with_name("avatar")
+
+# Estados que o avatar entende — os mesmos que o _expressao do app usa.
 EXPRESSOES = ("ociosa", "pensando", "falando", "feliz")
+
+_processo = None   # o Popen da janela do avatar, quando aberta
 
 
 def disponivel():
-    """True quando o modelo Live2D e as dependências estão instalados.
+    """True se dá pra abrir o avatar: o pywebview instalado E a página existe."""
+    try:
+        import webview  # noqa: F401
+    except ImportError:
+        return False
+    return (_PASTA_WEB / "index.html").exists()
 
-    Enquanto o avatar não existe, devolve False — assim, se alguém plugar
-    isto no app cedo demais, o Yato só cai no PNGTuber de reserva em vez de
-    quebrar. (Defesa em camadas.)"""
-    return False   # TODO: checar pywebview + arquivos do modelo Live2D
+
+def esta_aberto():
+    """True se a janela do avatar está aberta agora (o processo vivo)."""
+    return _processo is not None and _processo.poll() is None
 
 
 def mostrar():
-    """Abre a janela flutuante com o avatar por cima da tela.
-
-    TODO: criar a webview (pywebview) apontando pra uma página HTML local
-    que renderiza o modelo Live2D com pixi-live2d-display. Janela sem
-    moldura, sempre-no-topo, fundo transparente."""
-    raise NotImplementedError("Avatar Live2D ainda não construído — ver o plano no topo.")
+    """Abre a janela do avatar, se ainda não estiver aberta."""
+    global _processo
+    if esta_aberto():
+        return
+    # sys.executable = o MESMO Python do Yato (que tem o pywebview). Se o Yato
+    # foi aberto com pythonw, o avatar também abre sem terminal.
+    _processo = subprocess.Popen([sys.executable, str(_SCRIPT)])
 
 
 def esconder():
-    """Fecha/oculta a janela flutuante do avatar."""
-    raise NotImplementedError("Avatar Live2D ainda não construído.")
+    """Fecha a janela do avatar (encerra o processo)."""
+    global _processo
+    if _processo is not None:
+        _processo.terminate()
+        _processo = None
 
 
 def definir_expressao(nome):
-    """Reage a uma mudança de estado do Yato (é o que o _expressao do app
-    vai repassar pra cá).
-
-    TODO: mandar pro JavaScript da página aplicar a expressão/motion Live2D
-    correspondente (ex.: window.evaluate_js(f"setExpressao('{nome}')"))."""
+    """Repassa uma mudança de expressão pro avatar (ociosa/pensando/falando/feliz)."""
     if nome not in EXPRESSOES:
         logging.warning("Expressão desconhecida pro avatar: %s", nome)
-    # TODO: repassar 'nome' pra webview.
+        return
+    _comando(f"acao=expressao&nome={nome}")
 
 
-def lip_sync(amplitude):
-    """Abre a boca do avatar conforme o VOLUME do áudio (0.0 a 1.0).
+def lip_sync(forca):
+    """Move a boca do avatar conforme a força do som (0..1) — o lip-sync."""
+    _comando(f"acao=boca&valor={forca:.3f}")
 
-    A ideia: no voz.py, além de tocar o WAV, calcular a 'força' do som em
-    janelinhas de tempo e chamar isto — a boca acompanha a fala de verdade.
-    TODO: mapear amplitude → parâmetro ParamMouthOpenY do modelo Live2D."""
-    # TODO: window.evaluate_js(f"setBoca({amplitude})")
+
+def _comando(consulta):
+    """Liga pra a ponte do avatar SEM travar quem chamou (dispara numa thread).
+
+    Por que numa thread: o lip_sync é chamado a cada ~55ms durante a fala; se
+    esperássemos a resposta HTTP a cada vez, o ritmo da boca atrasaria em
+    relação ao som. Fire-and-forget mantém a sincronia. Silencioso se a janela
+    estiver fechada."""
+    def envia():
+        try:
+            urllib.request.urlopen(f"{_URL}?{consulta}", timeout=1).read()
+        except Exception:
+            pass   # avatar fechado/indisponível — o Yato segue normal
+    threading.Thread(target=envia, daemon=True).start()
