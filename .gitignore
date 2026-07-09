@@ -6,6 +6,10 @@ CLAUDE.md
 # redistribuir). Fica local pra testes; nunca sobe pro GitHub.
 yato-py/avatar/live2dcubismcore.min.js
 
+# Modelos Live2D (o Natori é Free Material License — usar pode, redistribuir
+# não). Ficam locais; o preparar.py baixa. As libs MIT (avatar/lib/) SOBEM.
+yato-py/avatar/modelos/
+
 # Lixo de sistema operacional
 Thumbs.db
 .DS_Store

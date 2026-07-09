@@ -1,11 +1,11 @@
 // avatar.js — carrega o avatar Live2D do Yato e faz a boca dele mexer (lip-sync).
 
 // A cara do Yato por enquanto: o NATORI (modelo Live2D oficial, gratuito) —
-// rapaz de ar sério. Vem do repositório CubismWebSamples da Live2D, via CDN.
+// rapaz de ar sério. Agora LOCAL (o preparar.py baixa pra modelos/Natori/),
+// então o avatar funciona offline. É Free Material License: não vai pro Git.
 // (O Yato próprio e o Ren Foster ficam pra depois — ver a memória do projeto.
 //  Obs.: o Ren é moc3 v6 e nenhuma lib web desenha v6 hoje; testado 08/07/2026.)
-const MODELO =
-  "https://cdn.jsdelivr.net/gh/Live2D/CubismWebSamples@develop/Samples/Resources/Natori/Natori.model3.json";
+const MODELO = "modelos/Natori/Natori.model3.json";
 
 // O PIXI é o "motor de desenho". backgroundAlpha: 0 = canvas transparente
 // (deixa o fundo do CSS aparecer; na janela flutuante vira a transparência).

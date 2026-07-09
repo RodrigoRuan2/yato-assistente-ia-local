@@ -2,11 +2,12 @@
 PREPARAR — monta o ambiente do Yato numa máquina nova, com um comando só.
 
 O repositório traz só o CÓDIGO. Os "ingredientes pesados" (bibliotecas, voz,
-cérebro) NÃO vão pro Git — este script baixa quase tudo:
+cérebro, avatar) NÃO vão pro Git — este script baixa quase tudo:
 
   1. cria o ambiente virtual (.venv) e instala as bibliotecas;
-  2. baixa a voz do Piper (pt-BR) pra a pasta vozes/;
-  3. puxa o modelo do Ollama (o cérebro), se o Ollama já estiver instalado.
+  2. baixa a voz do Piper (pt-BR) e o modelo do Whisper (ouvir);
+  3. baixa o avatar Live2D (Cubism Core + modelo Natori) pra local;
+  4. puxa o modelo do Ollama (o cérebro), se o Ollama já estiver instalado.
 
 O ÚNICO passo manual é instalar o Ollama (é um programa externo) — o script
 avisa se faltar. Rode a partir da pasta yato-py/ com:
@@ -36,6 +37,16 @@ BASE_VOZ = ("https://huggingface.co/rhasspy/piper-voices/resolve/main/"
             "pt/pt_BR/faber/medium/")
 ARQUIVOS_VOZ = ["pt_BR-faber-medium.onnx", "pt_BR-faber-medium.onnx.json"]
 
+# O avatar: as libs MIT (avatar/lib/) vêm no repo; o Cubism Core (proprietário)
+# e o modelo Natori (Free Material License) NÃO — este script baixa os dois.
+PASTA_AVATAR = RAIZ / "avatar"
+URL_CUBISM_CORE = ("https://cubism.live2d.com/sdk-web/cubismcore/"
+                   "live2dcubismcore.min.js")
+BASE_MODELO = ("https://cdn.jsdelivr.net/gh/Live2D/CubismWebSamples@develop/"
+               "Samples/Resources/Natori/")
+# A Live2D bloqueia download "sem cara de navegador" (403) — daí o User-Agent.
+_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
 
 def _python_do_venv():
     """O python.exe dentro do .venv (Windows)."""
@@ -43,7 +54,7 @@ def _python_do_venv():
 
 
 def passo_venv():
-    print("\n[1/4] Ambiente virtual + bibliotecas")
+    print("\n[1/5] Ambiente virtual + bibliotecas")
     if VENV.exists():
         print("  .venv já existe — ok")
     else:
@@ -82,7 +93,7 @@ def _progresso(nome):
 
 
 def passo_voz():
-    print("\n[2/4] Voz do Piper (pt-BR, faber)")
+    print("\n[2/5] Voz do Piper (pt-BR, faber)")
     PASTA_VOZES.mkdir(exist_ok=True)
     for nome in ARQUIVOS_VOZ:
         destino = PASTA_VOZES / nome
@@ -95,7 +106,7 @@ def passo_voz():
 
 
 def passo_whisper():
-    print("\n[3/4] Reconhecimento de voz (Whisper small)")
+    print("\n[3/5] Reconhecimento de voz (Whisper small)")
     print("  baixando o modelo (~460 MB na 1ª vez) ...")
     subprocess.run(
         [str(_python_do_venv()), "-c",
@@ -106,8 +117,50 @@ def passo_whisper():
     print("  reconhecimento pronto  OK")
 
 
+def _baixar(url, destino):
+    """Baixa um arquivo com 'cara de navegador' (a Live2D exige) pra 'destino'."""
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    req = urllib.request.Request(url, headers=_UA)
+    destino.write_bytes(urllib.request.urlopen(req, timeout=60).read())
+
+
+def passo_avatar():
+    import json
+    print("\n[4/5] Avatar Live2D (Cubism Core + modelo Natori)")
+    core = PASTA_AVATAR / "live2dcubismcore.min.js"
+    if core.exists():
+        print("  Cubism Core já existe — ok")
+    else:
+        print("  baixando o Cubism Core ...")
+        _baixar(URL_CUBISM_CORE, core)
+    modelo = PASTA_AVATAR / "modelos" / "Natori"
+    if (modelo / "Natori.model3.json").exists():
+        print("  modelo Natori já existe — ok")
+    else:
+        print("  baixando o modelo Natori (~3 MB) ...")
+        _baixar(BASE_MODELO + "Natori.model3.json", modelo / "Natori.model3.json")
+        # o model3.json LISTA todos os outros arquivos — baixa cada um deles
+        fr = json.loads((modelo / "Natori.model3.json")
+                        .read_text(encoding="utf-8"))["FileReferences"]
+        caminhos = []
+        if fr.get("Moc"):
+            caminhos.append(fr["Moc"])
+        caminhos += fr.get("Textures", [])
+        for chave in ("Physics", "Pose", "DisplayInfo"):
+            if fr.get(chave):
+                caminhos.append(fr[chave])
+        for e in fr.get("Expressions", []):
+            caminhos.append(e["File"])
+        for grupo in fr.get("Motions", {}).values():
+            for m in grupo:
+                caminhos.append(m["File"])
+        for c in caminhos:
+            _baixar(BASE_MODELO + c, modelo / c)
+    print("  avatar pronto  OK")
+
+
 def passo_ollama():
-    print("\n[4/4] Cérebro (Ollama)")
+    print("\n[5/5] Cérebro (Ollama)")
     if shutil.which("ollama") is None:
         print("  !! Ollama NÃO encontrado.")
         print("     Instale em https://ollama.com/download e depois rode:")
@@ -124,6 +177,7 @@ def main():
         passo_venv()
         passo_voz()
         passo_whisper()
+        passo_avatar()
         passo_ollama()
     except subprocess.CalledProcessError as e:
         print(f"\n!! Um passo falhou: {e}")

@@ -6,17 +6,17 @@
   <title>Yato — Avatar</title>
   <link rel="stylesheet" href="estilo.css">
 
-  <!-- As 3 bibliotecas do Live2D (por enquanto do CDN; depois viram locais):
-       1) o runtime OFICIAL da Live2D (Cubism 4) — quem entende o modelo;
-       2) PIXI.js 6.5.2 — o motor de desenho 2D (a v6 é a que o renderizador
-          exige; a v7+ tem outra API e quebra);
-       3) pixi-live2d-display 0.4.0, bundle "cubism4" — a cola Live2D↔PIXI.
-          VERSÕES PINADAS de propósito: o "latest" do CDN servia um bundle que
-          NÃO expunha a classe Live2DModel (só um 'config' vazio). A 0.4.0
-          funciona. Não troque por @latest sem testar. -->
-  <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.2/dist/browser/pixi.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+  <!-- As 3 bibliotecas do Live2D, agora LOCAIS (o avatar funciona offline):
+       1) live2dcubismcore.min.js — runtime OFICIAL da Live2D (Cubism 4). É
+          PROPRIETÁRIO: não vai pro Git; o preparar.py baixa (User-Agent);
+       2) lib/pixi.min.js — PIXI.js 6.5.2, o motor de desenho 2D (a v6 é a que
+          o renderizador exige; v7+ tem outra API e quebra). MIT, vai no repo;
+       3) lib/cubism4.min.js — pixi-live2d-display 0.4.0, a cola Live2D↔PIXI.
+          MIT, vai no repo. VERSÃO PINADA: o "latest" servia um bundle sem a
+          classe Live2DModel. A 0.4.0 funciona — não troque sem testar. -->
+  <script src="live2dcubismcore.min.js"></script>
+  <script src="lib/pixi.min.js"></script>
+  <script src="lib/cubism4.min.js"></script>
 </head>
 <body>
   <!-- Fechar o mascote (só funciona na janela sem-moldura; no navegador é
