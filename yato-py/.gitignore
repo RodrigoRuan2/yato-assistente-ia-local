@@ -26,3 +26,7 @@ imagens_geradas/
 # O Electron do avatar (~200 MB) é baixado pelo npm install (o preparar.py roda).
 # Só o código (main.js/preload.js/package.json) vai pro repo.
 avatar-electron/node_modules/
+
+# O atalho "Yato.lnk" tem caminhos ABSOLUTOS desta máquina — o preparar.py
+# recria ele em cada máquina, então não vai pro repositório.
+*.lnk

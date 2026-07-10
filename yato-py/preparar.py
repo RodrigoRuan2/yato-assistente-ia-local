@@ -54,7 +54,7 @@ def _python_do_venv():
 
 
 def passo_venv():
-    print("\n[1/5] Ambiente virtual + bibliotecas")
+    print("\n[1/6] Ambiente virtual + bibliotecas")
     if VENV.exists():
         print("  .venv já existe — ok")
     else:
@@ -93,7 +93,7 @@ def _progresso(nome):
 
 
 def passo_voz():
-    print("\n[2/5] Voz do Piper (pt-BR, faber)")
+    print("\n[2/6] Voz do Piper (pt-BR, faber)")
     PASTA_VOZES.mkdir(exist_ok=True)
     for nome in ARQUIVOS_VOZ:
         destino = PASTA_VOZES / nome
@@ -106,7 +106,7 @@ def passo_voz():
 
 
 def passo_whisper():
-    print("\n[3/5] Reconhecimento de voz (Whisper small)")
+    print("\n[3/6] Reconhecimento de voz (Whisper small)")
     print("  baixando o modelo (~460 MB na 1ª vez) ...")
     subprocess.run(
         [str(_python_do_venv()), "-c",
@@ -126,7 +126,7 @@ def _baixar(url, destino):
 
 def passo_avatar():
     import json
-    print("\n[4/5] Avatar Live2D (Cubism Core + modelo Natori)")
+    print("\n[4/6] Avatar Live2D (Cubism Core + modelo Natori)")
     core = PASTA_AVATAR / "live2dcubismcore.min.js"
     if core.exists():
         print("  Cubism Core já existe — ok")
@@ -173,7 +173,7 @@ def passo_avatar():
 
 
 def passo_ollama():
-    print("\n[5/5] Cérebro (Ollama)")
+    print("\n[5/6] Cérebro (Ollama)")
     if shutil.which("ollama") is None:
         print("  !! Ollama NÃO encontrado.")
         print("     Instale em https://ollama.com/download e depois rode:")
@@ -184,6 +184,48 @@ def passo_ollama():
     print("  cérebro pronto  OK")
 
 
+def passo_atalho():
+    print("\n[6/6] Atalho do Yato (ícone + abrir sem terminal)")
+    if not sys.platform.startswith("win"):
+        print("  (só faz sentido no Windows) — pulando")
+        return
+
+    # 1) Gera o assets/yato.ico a partir da arte, se ainda não existir.
+    icone_png = RAIZ / "assets" / "icone.png"
+    icone_ico = RAIZ / "assets" / "yato.ico"
+    if icone_ico.exists():
+        print("  yato.ico já existe — ok")
+    elif icone_png.exists():
+        from PIL import Image
+        img = Image.open(icone_png).convert("RGBA")
+        # bitmap_format="bmp": SEM isso, o Pillow salva os quadros como PNG, e o
+        # iconbitmap do Tkinter NÃO lê quadros PNG — o ícone da janela aberta
+        # fica borrado. Com BMP, o Tk lê e a barra de tarefas fica nítida.
+        img.save(icone_ico, format="ICO", bitmap_format="bmp",
+                 sizes=[(256, 256), (128, 128), (64, 64), (48, 48),
+                        (32, 32), (24, 24), (16, 16)])
+        print("  yato.ico gerado da arte (assets/icone.png)")
+    else:
+        print("  !! assets/icone.png não encontrado — atalho ficará sem ícone.")
+
+    # 2) Cria o "Yato.lnk" apontando pro pythonw + app.py (sem console). O .lnk
+    #    guarda caminhos ABSOLUTOS, por isso é recriado aqui em cada máquina.
+    pythonw = VENV / "Scripts" / "pythonw.exe"
+    lnk = RAIZ / "Yato.lnk"
+    ps = (
+        "$w = New-Object -ComObject WScript.Shell; "
+        f"$s = $w.CreateShortcut('{lnk}'); "
+        f"$s.TargetPath = '{pythonw}'; "
+        "$s.Arguments = 'app.py'; "
+        f"$s.WorkingDirectory = '{RAIZ}'; "
+        f"$s.IconLocation = '{icone_ico}'; "
+        "$s.Description = 'Yato - IA local'; "
+        "$s.Save()"
+    )
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True)
+    print(f"  atalho criado: {lnk.name}  OK  (arraste pra Área de Trabalho se quiser)")
+
+
 def main():
     print("=== Preparando o Yato ===")
     try:
@@ -192,12 +234,13 @@ def main():
         passo_whisper()
         passo_avatar()
         passo_ollama()
+        passo_atalho()
     except subprocess.CalledProcessError as e:
         print(f"\n!! Um passo falhou: {e}")
         print("   Confira a mensagem acima e rode de novo — o script pula o que já ficou pronto.")
         sys.exit(1)
-    print("\nTudo pronto! Abra o Yato com um duplo-clique em 'Iniciar Yato.bat'")
-    print("(ou:  .venv\\Scripts\\Activate.ps1  e depois  python app.py)")
+    print("\nTudo pronto! Abra o Yato com um duplo-clique no atalho 'Yato' (com ícone)")
+    print("(ou no 'Iniciar Yato.bat', ou:  .venv\\Scripts\\Activate.ps1  e  python app.py)")
 
 
 if __name__ == "__main__":

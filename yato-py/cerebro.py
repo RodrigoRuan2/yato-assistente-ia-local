@@ -8,10 +8,13 @@ Repare que aqui NÃO existe nada de janela/botão. É de propósito: a lógica d
 """
 
 import json
+import os
 import re
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 import requests
 
@@ -369,6 +372,31 @@ def pensar(mensagens, temperatura=TEMPERATURA_PADRAO, ao_receber=None, ao_buscar
     # Estourou o limite de voltas: melhor parar com uma mensagem honesta
     # do que deixar o modelo buscando em círculos.
     raise CerebroError("Me enrolei nas buscas e não cheguei numa resposta 😵 Tenta de novo?")
+
+
+# O executável do app do Ollama (o ícone perto do relógio, que mantém o
+# servidor local de pé). É o MESMO que o atalho "Iniciar Yato" abria via .bat.
+OLLAMA_APP = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama app.exe"
+
+
+def _ollama_no_ar():
+    """True se o servidor do Ollama já está respondendo (rápido, pra decidir se
+    precisamos abri-lo)."""
+    try:
+        return requests.get("http://localhost:11434/api/tags", timeout=2).ok
+    except requests.exceptions.RequestException:
+        return False
+
+
+def garantir_ollama():
+    """Garante que o Ollama esteja de pé: se o servidor não responder, abre o
+    'ollama app.exe' (o mesmo que o .bat fazia). É isso que deixa o Yato ligar
+    SOZINHO, sem precisar do atalho .bat. Se já estiver no ar, não faz nada; se
+    não achar o executável, deixa quieto (o acordar() insiste e o status avisa)."""
+    if _ollama_no_ar():
+        return
+    if OLLAMA_APP.exists():
+        subprocess.Popen([str(OLLAMA_APP)])
 
 
 def acordar(tentativas=6, espera=5):

@@ -28,7 +28,7 @@ import customtkinter as ctk
 from PIL import Image, ImageGrab
 
 from personalidade import PERSONALIDADE
-from cerebro import pensar, acordar, CerebroError, MODELO
+from cerebro import pensar, acordar, garantir_ollama, CerebroError, MODELO
 from memoria import (carregar_fatos, listar_conversas, novo_arquivo_conversa,
                      salvar_conversa_em, carregar_falas_de,
                      renomear_conversa, excluir_conversa)
@@ -97,6 +97,29 @@ class App(ctk.CTk):
         self.title("Yato — IA local")
         self.geometry("520x660")
         self.minsize(420, 480)
+
+        # Sem isto, o Windows agrupa a janela sob o ícone do 'pythonw' na barra
+        # de tarefas (porque é ele que roda o app). Dar um "AppUserModelID"
+        # próprio faz o Windows tratar o Yato como um app à parte e usar O NOSSO
+        # ícone na barra. (Só no Windows; se falhar, seguimos sem.)
+        if sys.platform.startswith("win"):
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("yato.ia.local")
+            except Exception:
+                pass
+
+        # Ícone da janela (aparece no título e na barra de tarefas). Só aplica
+        # se o .ico existir — nunca deixamos isso quebrar a abertura do app. O
+        # CustomTkinter define o ícone DELE ~200ms depois de abrir, sobrescrevendo
+        # o nosso; por isso reforçamos com um after() pra o do Yato prevalecer.
+        icone = Path(__file__).parent / "assets" / "yato.ico"
+        if icone.exists():
+            try:
+                self.iconbitmap(str(icone))
+                self.after(300, lambda: self.iconbitmap(str(icone)))
+            except Exception:
+                pass   # sistema sem suporte a .ico — segue sem ícone custom
 
         # ---- ESTADO: o histórico da conversa mora aqui ----
         # Personalidade sempre FRESCA (vem do código, nunca do disco). O app
@@ -693,7 +716,9 @@ class App(ctk.CTk):
         self.rotulo_dica.configure(text=DICAS_MODO.get(modo, ""))
 
     def _acordar_cerebro(self):
-        """Roda numa thread de fundo ao abrir: carrega o modelo e mostra o status."""
+        """Roda numa thread de fundo ao abrir: garante o Ollama de pé, carrega
+        o modelo e mostra o status."""
+        garantir_ollama()    # liga o Ollama se ele estiver fechado (dispensa o .bat)
         pronto = acordar()   # demora ~20s se o modelo estiver "frio"
         texto = "● pronto" if pronto else "● Ollama fechado"
         cor = "#2ecc71" if pronto else "#e74c3c"
