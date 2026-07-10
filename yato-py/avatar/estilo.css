@@ -22,17 +22,17 @@ body {
   height: 100%;
 }
 
-/* A CAMADA DE ARRASTE: uma div transparente FOCADA no personagem (não na
-   janela inteira). É ela (um elemento simples, não o canvas WebGL) que leva o
-   -webkit-app-region: drag — o Chromium faz o hit-test do arraste certo aqui.
-   Como é uma faixa central, arrastar o PERSONAGEM move a janela, mas os cantos
-   transparentes vazios não capturam o arraste. */
+/* A CAMADA DE ARRASTE: uma div transparente sobre o TORSO do personagem. É ela
+   (um elemento simples, não o canvas WebGL) que leva o -webkit-app-region:
+   drag. Só o torso move a janela; o resto (cabeça, pernas, cantos vazios) fica
+   click-through — o clique atravessa pro que está atrás. Estes valores (torso)
+   podem ser afinados se a área de pegada ficar grande/pequena demais. */
 #arraste {
   position: fixed;
-  top: 12%;
-  bottom: 14%;
-  left: 33%;
-  right: 33%;
+  top: 30%;
+  bottom: 18%;
+  left: 24%;
+  right: 24%;
   z-index: 5;
   -webkit-app-region: drag;
 }

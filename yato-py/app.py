@@ -24,8 +24,6 @@ import threading
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-import tkinter
-import tkinter.font as tkfont
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -341,60 +339,92 @@ class App(ctk.CTk):
 
     # ------------------------------------------------- menu de funções (⋮)
     def _abrir_menu_funcoes(self):
-        """Abre/fecha o menu ⋮ com as funções do Yato (só os NOMES).
+        """Abre/fecha o menu ⋮ — um cartão DENTRO da própria janela do Yato.
 
-        TOGGLE: clicar no ⋮ de novo FECHA. Um menu nativo já se fecha ao clicar
-        fora — mas esse mesmo clique no botão o reabriria na sequência. Então,
-        quando o menu some (evento <Unmap>), guardamos o instante; se o ⋮ for
-        clicado logo em seguida (o clique que fechou), a gente NÃO reabre.
+        Por que dentro (e não um Toplevel separado): num Toplevel com fundo
+        transparente o CustomTkinter NÃO desenha os cantos arredondados nem as
+        linhas (testado). Como filho da janela, ele renderiza de verdade E anda
+        junto quando você move o Yato. Fica por cima do chat via place()+lift().
 
-        Ele abre pra DENTRO da janela: como o ⋮ fica colado na borda direita,
-        alinhamos a borda direita do menu com a do botão e o deixamos crescer
-        pra esquerda e pra baixo (senão vazaria pra fora do Yato).
+        TOGGLE: clicar no ⋮ de novo fecha; clicar fora do cartão também. O
+        carimbo de tempo evita que o mesmo clique que fechou reabra na hora.
         """
+        if getattr(self, "_menu_cartao", None) is not None:
+            self._fechar_menu_funcoes()          # já aberto → este clique fecha
+            return
         if time.monotonic() - getattr(self, "_menu_fechado_em", 0) < 0.25:
-            return   # foi o clique que ACABOU de fechar o menu — não reabre
+            return   # o clique que ACABOU de fechar chegou no ⋮ — não reabre
 
-        rotulos = ["Nova conversa", "Histórico de conversas", "Memória",
-                   "Ler respostas em voz alta", "Abrir pasta do projeto"]
-        # Cinza PADRÃO do CustomTkinter (o mesmo das superfícies do Yato),
-        # resolvido pro modo claro/escuro atual — em vez de uma cor fixa minha.
-        cor_fundo = self._apply_appearance_mode(
-            ctk.ThemeManager.theme["CTkFrame"]["fg_color"])
-        menu = tkinter.Menu(
-            self, tearoff=0,
-            bg=cor_fundo, fg="#e6e6f0",
-            activebackground="#6c5ce7", activeforeground="white",
-            bd=0, font=("Segoe UI", 11),
+        cartao = ctk.CTkFrame(
+            self, corner_radius=12,
+            fg_color=ctk.ThemeManager.theme["CTkFrame"]["fg_color"],
+            border_width=1, border_color=("gray60", "#5c5c6a"),
         )
-        menu.add_command(label="Nova conversa", command=self.nova_conversa)
-        menu.add_command(label="Histórico de conversas", command=self.toggle_painel)
-        menu.add_command(label="Memória", command=self.mostrar_memoria)
-        menu.add_separator()
-        # A voz é um checkbutton: o ✓ nativo mostra se está ligada. O var é
-        # recriado a cada abertura a partir de self.voz_ligada, então sempre
-        # reflete o estado atual (o toggle de verdade mora no _toggle_voz).
-        self._var_voz = tkinter.BooleanVar(value=self.voz_ligada)
-        menu.add_checkbutton(label="Ler respostas em voz alta",
-                             variable=self._var_voz, command=self._toggle_voz)
-        menu.add_separator()
-        menu.add_command(label="Abrir pasta do projeto",
-                         command=self._abrir_pasta_projeto)
-        # Ao sumir (item escolhido OU clique fora OU clique no próprio ⋮),
-        # marca o instante — é isso que faz o toggle pelo botão funcionar.
-        menu.bind("<Unmap>",
-                  lambda e: setattr(self, "_menu_fechado_em", time.monotonic()))
 
-        # Largura estimada do menu = a maior label + folga das margens. Com
-        # ela, ancoramos a borda direita do menu na direita do botão ⋮.
-        fonte = tkfont.Font(family="Segoe UI", size=11)
-        largura = max(fonte.measure(t) for t in rotulos) + 70
-        x = self.botao_menu.winfo_rootx() + self.botao_menu.winfo_width() - largura
-        y = self.botao_menu.winfo_rooty() + self.botao_menu.winfo_height()
-        try:
-            menu.tk_popup(x, y)
-        finally:
-            menu.grab_release()
+        def _item(texto, comando, marcado=False):
+            ctk.CTkButton(
+                cartao, text=("✓   " if marcado else "      ") + texto,
+                anchor="w", height=30, corner_radius=6,
+                fg_color="transparent", hover_color=("gray82", "#3a3a46"),
+                text_color=("gray10", "#e6e6f0"),
+                command=lambda: (self._fechar_menu_funcoes(), comando()),
+            ).pack(fill="x", padx=6, pady=1)
+
+        def _separador():
+            # Linha VISÍVEL de ponta a ponta (como no menu do Claude). O
+            # corner_radius=0 é ESSENCIAL: com o padrão (6), o arredondamento
+            # "come" uma linha de 1px e ela some.
+            ctk.CTkFrame(cartao, height=2, corner_radius=0,
+                         fg_color=("#9a9aa6", "#70707e")).pack(fill="x", padx=8, pady=7)
+
+        ctk.CTkFrame(cartao, height=4, fg_color="transparent").pack()  # respiro
+        _item("Nova conversa", self.nova_conversa)
+        _item("Histórico de conversas", self.toggle_painel)
+        _item("Memória", self.mostrar_memoria)
+        _separador()   # {Nova, Histórico, Memória}  |  {Ler, Abrir pasta}
+        _item("Ler respostas em voz alta", self._toggle_voz, marcado=self.voz_ligada)
+        _item("Abrir pasta do projeto", self._abrir_pasta_projeto)
+        ctk.CTkFrame(cartao, height=4, fg_color="transparent").pack()  # respiro
+        self._menu_cartao = cartao
+
+        # Posiciona com place() em coords RELATIVAS à janela: borda direita do
+        # cartão alinhada com a do botão ⋮ (abre pra dentro), logo abaixo dele.
+        cartao.update_idletasks()
+        larg = cartao.winfo_reqwidth()
+        bx = self.botao_menu.winfo_rootx() - self.winfo_rootx()
+        by = self.botao_menu.winfo_rooty() - self.winfo_rooty()
+        x = bx + self.botao_menu.winfo_width() - larg
+        y = by + self.botao_menu.winfo_height() + 4
+        cartao.place(x=x, y=y)
+        cartao.lift()
+
+        # Fecha ao clicar em qualquer lugar FORA do cartão.
+        self._menu_bind = self.bind("<Button-1>", self._clique_fora_menu, add="+")
+
+    def _clique_fora_menu(self, evento):
+        """Fecha o menu se o clique NÃO caiu dentro do cartão (nem num item dele)."""
+        cartao = getattr(self, "_menu_cartao", None)
+        if cartao is None:
+            return
+        # Sobe a árvore do widget clicado: se topar no cartão, foi DENTRO.
+        w = evento.widget
+        while w is not None:
+            if w == cartao:
+                return
+            w = getattr(w, "master", None)
+        self._fechar_menu_funcoes()
+
+    def _fechar_menu_funcoes(self):
+        """Fecha o cartão e carimba o instante (pro toggle não reabrir na hora)."""
+        cartao = getattr(self, "_menu_cartao", None)
+        if cartao is not None:
+            self._menu_cartao = None
+            self._menu_fechado_em = time.monotonic()
+            bind_id = getattr(self, "_menu_bind", None)
+            if bind_id:
+                self.unbind("<Button-1>", bind_id)
+                self._menu_bind = None
+            cartao.destroy()
 
     def _abrir_pasta(self, pasta):
         """Abre uma pasta no Explorer do Windows (os.startfile só existe lá)."""

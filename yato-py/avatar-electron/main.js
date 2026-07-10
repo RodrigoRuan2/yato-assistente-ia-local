@@ -5,7 +5,7 @@
 // TESTE inicial: só abrir a janela transparente com o Natori. A ponte de
 // controle (receber comandos do Yato) entra depois, se a transparência colar.
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -88,6 +88,35 @@ function criarJanela() {
   // de trabalho virtuais, em vez de sumir quando você troca.
   janela.setAlwaysOnTop(true, "screen-saver");
   janela.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  // CLICK-THROUGH INTELIGENTE: por padrão a janela deixa o clique ATRAVESSAR
+  // (as partes vazias do avatar não roubam o clique de quem está atrás). Ela só
+  // vira "sólida" (arrastável) quando o cursor está sobre o TORSO do personagem.
+  janela.setIgnoreMouseEvents(true, { forward: true });
+
+  // A detecção mora AQUI no main, NÃO na página — de propósito. Os eventos de
+  // mouse "forwarded" pra página só chegam quando o avatar está em FOCO; depois
+  // de um alt-tab paravam e o avatar "congelava". O main, em vez disso, consulta
+  // a posição GLOBAL do cursor (screen.getCursorScreenPoint), que funciona
+  // sempre — com foco ou sem. O retângulo do TORSO abaixo é o MESMO #arraste do
+  // estilo.css (se afinar um, afine o outro).
+  const TORSO = { top: 0.30, bottom: 0.18, left: 0.24, right: 0.24 };
+  let solido = false;
+  setInterval(() => {
+    if (!janela || janela.isDestroyed()) return;
+    const b = janela.getBounds();
+    const p = screen.getCursorScreenPoint();
+    const dentro =
+      p.x >= b.x + b.width * TORSO.left &&
+      p.x <= b.x + b.width * (1 - TORSO.right) &&
+      p.y >= b.y + b.height * TORSO.top &&
+      p.y <= b.y + b.height * (1 - TORSO.bottom);
+    if (dentro !== solido) {
+      solido = dentro;
+      // dentro do torso → captura o clique (arrasta); fora → deixa atravessar.
+      janela.setIgnoreMouseEvents(!dentro, { forward: true });
+    }
+  }, 50);
 
   // Rede de segurança pro FECHAR: escuta o ESC direto aqui no main (não
   // depende do preload/IPC). Se o IPC falhar, o ESC ainda fecha.

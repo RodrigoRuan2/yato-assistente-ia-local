@@ -110,5 +110,10 @@ window.avatarDebug = () => ({
   contextoPerdido: app.renderer.gl ? app.renderer.gl.isContextLost() : "n/a",
 });
 
+// CLICK-THROUGH: a janela toda deixa o clique atravessar (as partes vazias do
+// avatar não roubam mais o clique de quem está atrás). Só a FAIXA DE ARRASTE
+// (#arraste, sobre o personagem) fica sólida — enquanto o mouse está sobre ela.
+// mouseenter/mouseleave disparam mesmo no modo click-through porque o main
+// abriu a janela com forward:true (os eventos de movimento chegam à página).
 window.addEventListener("resize", encaixar);
 carregar(MODELO);   // a cara do Yato: Natori
