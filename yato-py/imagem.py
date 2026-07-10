@@ -26,6 +26,8 @@ na próxima mensagem do chat.
 
 import base64
 import logging
+import os
+import subprocess
 import time
 from pathlib import Path
 
@@ -35,6 +37,16 @@ from cerebro import OLLAMA_URL, MODELO
 
 FORGE_URL = "http://127.0.0.1:7860"
 PASTA_IMAGENS = Path(__file__).with_name("imagens_geradas")
+
+# ONDE o Forge está instalado NA SUA MÁQUINA. Ele é um app gigante À PARTE, fora
+# do repositório do Yato — por isso o caminho é absoluto e mora aqui (não no
+# projeto). Dá pra apontar por variável de ambiente YATO_FORGE; se ela não
+# existir, cai no caminho padrão abaixo. Mude se o seu Forge estiver noutro lugar.
+PASTA_FORGE = Path(os.environ.get(
+    "YATO_FORGE", r"C:\Users\ruanc\projetos\Criando o Yato\webui"))
+BAT_FORGE = PASTA_FORGE / "webui-user.bat"
+
+_processo_forge = None   # o Popen do Forge, quando foi o Yato que o abriu
 
 # As tags de qualidade recomendadas para o Nova Anime XL (checkpoint
 # Illustrious) — confirmadas na página oficial do modelo no Civitai.
@@ -91,6 +103,55 @@ def disponivel():
         return r.ok
     except requests.exceptions.RequestException:
         return False
+
+
+def forge_instalado():
+    """True se dá pra achar o webui-user.bat — ou seja, se o Yato consegue
+    abrir o Forge sozinho. (Se der False, o caminho PASTA_FORGE está errado.)"""
+    return BAT_FORGE.exists()
+
+
+def abrir_forge():
+    """Abre o Forge (webui-user.bat) numa JANELA DE TERMINAL PRÓPRIA, pra você
+    acompanhar o boot (~40s no 1º boot) e os logs. NÃO espera ficar pronto —
+    quem chama usa o esperar_disponivel() pra isso. Não abre de novo se já
+    estiver no ar ou já estiver abrindo. Retorna False se não achou o .bat."""
+    global _processo_forge
+    if disponivel():
+        return True   # já está no ar — nada a fazer
+    if _processo_forge is not None and _processo_forge.poll() is None:
+        return True   # já estamos abrindo — não abre uma segunda instância
+    if not BAT_FORGE.exists():
+        return False
+    # Alguns ambientes definem NoDefaultCurrentDirectoryInExePath=1 (um
+    # endurecimento de segurança) — isso faz o cmd NÃO procurar comandos na
+    # pasta atual, e o webui-user.bat quebra logo no "call webui.bat". Tiramos
+    # essa variável SÓ pro processo do Forge, pra ele sempre achar o webui.bat.
+    ambiente = {k: v for k, v in os.environ.items()
+                if k.lower() != "nodefaultcurrentdirectoryinexepath"}
+    # cmd /c <bat> numa CONSOLE NOVA: o Forge ganha o próprio terminal (mostra o
+    # boot e os logs) e NÃO morre junto se o Yato fechar. CREATE_NEW_CONSOLE só
+    # existe no Windows — o getattr deixa o código não quebrar noutro sistema.
+    nova_console = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+    _processo_forge = subprocess.Popen(
+        ["cmd", "/c", str(BAT_FORGE)],
+        cwd=str(PASTA_FORGE),
+        env=ambiente,
+        creationflags=nova_console,
+    )
+    return True
+
+
+def esperar_disponivel(timeout=150, intervalo=2):
+    """Fica checando até o Forge responder (ou estourar o timeout). Serve pra
+    usar DEPOIS do abrir_forge(), porque o boot demora. Retorna True se ficou
+    pronto a tempo. Chame numa thread — ela dorme entre as tentativas."""
+    limite = time.time() + timeout
+    while time.time() < limite:
+        if disponivel():
+            return True
+        time.sleep(intervalo)
+    return False
 
 
 def listar_modelos():

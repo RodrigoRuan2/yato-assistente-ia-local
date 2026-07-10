@@ -364,8 +364,11 @@ Como funciona por dentro:
 - **O Yato não gera a imagem — o Forge gera.** O [Forge](https://github.com/lllyasviel/stable-diffusion-webui-forge)
   (Stable Diffusion WebUI) é um programa **à parte**, aberto com a flag `--api`.
   O `imagem.py` só manda o pedido pra ele por HTTP local (`/sdapi/v1/txt2img`),
-  **sem chave nenhuma** — o mesmo espírito do `cerebro.py` com o Ollama. É um
-  passo **opcional**: sem o Forge aberto, a aba avisa e o resto do Yato funciona.
+  **sem chave nenhuma** — o mesmo espírito do `cerebro.py` com o Ollama.
+- **O Yato abre o Forge sozinho.** Se você mandar gerar e o Forge estiver
+  fechado, o Yato acha o `webui-user.bat` e o abre numa janela própria, esperando
+  o boot (~50s) antes de desenhar. O caminho do Forge vem da variável de ambiente
+  `YATO_FORGE` (ou o padrão no `imagem.py`). Se o `.bat` não for achado, a aba avisa.
 - **✨ Melhorar prompt:** o `cerebro.py` (qwen2.5) traduz sua ideia pra um prompt
   em inglês, no estilo *tags* que os modelos Illustrious esperam. Regra esperta:
   pra **personagem conhecido**, ele escreve só o nome + a obra e **não inventa a
@@ -380,8 +383,9 @@ Como funciona por dentro:
   (viram garranchos), então o *prompt negativo* já bloqueia texto/marca-d'água.
 - As imagens saem em `imagens_geradas/` (é o seu conteúdo — fica no `.gitignore`).
 
-Pré-requisito: **instalar o Forge** e abri-lo com `--api`. Ele é pesado e roda
-na GPU; não vem com o `preparar.py` (é um projeto externo, instalado à parte).
+Pré-requisito: **instalar o Forge** e deixar a flag `--api` no `webui-user.bat`
+(o Yato o abre sozinho, mas precisa do `--api` pra falar com ele). Ele é pesado e
+roda na GPU; não vem com o `preparar.py` (é um projeto externo, instalado à parte).
 
 ## Se algo der errado
 
@@ -513,7 +517,8 @@ O projeto evolui em **rodadas** — cada uma vira um commit com nome claro.
       que já faz o cérebro conviver com o olho da visão
 - [x] Seletor de **checkpoint** (Nova Anime XL, WAI-Illustrious…) + prompt
       negativo contra texto/marca-d'água
-- [ ] Futuro: o Yato abrir o Forge sozinho quando precisar (hoje é manual)
+- [x] O Yato abre o Forge sozinho ao gerar (acha o `webui-user.bat` via
+      `YATO_FORGE`, sobe numa console própria e espera o boot)
 
 ### 💡 Depois (sem número ainda)
 - [ ] Mais ferramentas (clima, lembretes, ler arquivos...)

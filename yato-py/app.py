@@ -505,6 +505,14 @@ class App(ctk.CTk):
         self.status_imagem.configure(text="🎨 desenhando… (pode levar uns 20-30s)")
 
         def trabalhar():
+            # Se o Forge estiver fechado, o Yato ABRE ele sozinho e espera o
+            # boot antes de desenhar. Se não der, _garantir_forge já avisou.
+            if not self._garantir_forge():
+                return
+            # Reafirma o status de "desenhando" (o _garantir_forge pode ter
+            # deixado o aviso de "abrindo o Forge" na tela).
+            self.after(0, lambda: self.status_imagem.configure(
+                text="🎨 desenhando… (pode levar uns 20-30s)"))
             try:
                 caminho = imagem.gerar(prompt)
                 self.after(0, lambda: self._imagem_pronta(caminho))
@@ -512,6 +520,32 @@ class App(ctk.CTk):
                 self.after(0, lambda: self.status_imagem.configure(text=str(erro)))
 
         threading.Thread(target=trabalhar, daemon=True).start()
+
+    def _garantir_forge(self):
+        """Garante que o Forge esteja no ar. Se estiver fechado, ABRE ele
+        sozinho (webui-user.bat, numa console própria) e espera o boot. Roda
+        DENTRO da thread de trabalho — os avisos vão pra UI via self.after.
+        Retorna True quando o Forge está pronto pra usar."""
+        if imagem.disponivel():
+            return True
+        if not imagem.forge_instalado():
+            self.after(0, lambda: self.status_imagem.configure(
+                text="Não achei o Forge pra abrir — confira o caminho (variável YATO_FORGE)."))
+            return False
+        self.after(0, lambda: self.status_imagem.configure(
+            text="🚀 abrindo o Forge sozinho… (o boot leva ~40s, só na 1ª vez)"))
+        imagem.abrir_forge()
+        if imagem.esperar_disponivel():
+            # O Forge acabou de subir: o seletor ainda mostra "(Forge fechado)".
+            # Como já estamos numa thread, buscamos os modelos aqui e atualizamos
+            # o dropdown SILENCIOSAMENTE (sem mexer no status — que vira "desenhando").
+            modelos = imagem.listar_modelos()
+            atual = imagem.modelo_atual()
+            self.after(0, lambda: self._preencher_seletor_modelos(modelos, atual))
+            return True
+        self.after(0, lambda: self.status_imagem.configure(
+            text="O Forge demorou demais pra abrir 😕 tenta gerar de novo em instantes."))
+        return False
 
     def _imagem_pronta(self, caminho):
         """Mostra a imagem gerada no rótulo, redimensionada pra caber."""
@@ -544,19 +578,28 @@ class App(ctk.CTk):
         if not modelos:
             self.seletor_modelo_imagem.configure(values=["(Forge fechado)"])
             self.seletor_modelo_imagem.set("(Forge fechado)")
-            self.status_imagem.configure(text="Forge indisponível — abra o webui-user.bat.")
+            self.status_imagem.configure(
+                text="Forge fechado — o Yato abre sozinho quando você gerar.")
             return
+        self._preencher_seletor_modelos(modelos, atual)
+        self.status_imagem.configure(
+            text=f"{len(self._modelos_disponiveis)} modelo(s) disponível(is).")
 
+    def _preencher_seletor_modelos(self, modelos, atual):
+        """Popula o dropdown de checkpoints SEM tocar no status. Assim serve
+        tanto pro refresh explícito (que mostra a mensagem) quanto pro refresh
+        SILENCIOSO depois do auto-open do Forge — que não pode atropelar o
+        status de '🎨 desenhando…' que já vai aparecer."""
+        if not modelos:
+            return
         self._modelos_disponiveis = {self._nome_amigavel_modelo(t): t for t in modelos}
         nomes = list(self._modelos_disponiveis.keys())
         self.seletor_modelo_imagem.configure(values=nomes)
-
         # Marca no seletor o que já está carregado de fato no Forge (pode ter
         # sido trocado por fora, direto na WebUI).
         nome_atual = next((n for n, t in self._modelos_disponiveis.items()
                            if atual and t.startswith(atual)), nomes[0])
         self.seletor_modelo_imagem.set(nome_atual)
-        self.status_imagem.configure(text=f"{len(nomes)} modelo(s) disponível(is).")
 
     def _trocar_modelo_click(self, nome_amigavel):
         """Chamado pelo seletor: troca o checkpoint ativo no Forge (demora —
