@@ -10,8 +10,9 @@ REM    estiver la, pulamos - assim nao roubamos o foco a toa.
 tasklist /FI "IMAGENAME eq ollama app.exe" | find /I "ollama app.exe" >nul
 if errorlevel 1 start "" "%LOCALAPPDATA%\Programs\Ollama\ollama app.exe"
 
-REM 2) Entra na pasta do projeto (caminho absoluto = funciona de qualquer lugar).
-cd /d "C:\Users\ruanc\projetos\Chat bot\yato-py"
+REM 2) Entra na pasta do projeto. %~dp0 = "a pasta onde este .bat esta",
+REM    entao funciona em qualquer maquina, sem caminho fixo.
+cd /d "%~dp0"
 
 REM 3) Abre a janela da Yato SEM tela preta de terminal (pythonw).
 start "" ".venv\Scripts\pythonw.exe" "app.py"
