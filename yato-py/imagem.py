@@ -53,6 +53,7 @@ PASTA_FORGE = Path(os.environ.get(
     "YATO_FORGE", r"C:\Users\ruanc\projetos\Criando o Yato\webui"))
 BAT_FORGE = PASTA_FORGE / "webui-user.bat"
 PASTA_LORA = PASTA_FORGE / "models" / "Lora"
+PASTA_CHECKPOINTS = PASTA_FORGE / "models" / "Stable-diffusion"
 
 _processo_forge = None   # o Popen do Forge, quando foi o Yato que o abriu
 
@@ -329,6 +330,18 @@ def listar_modelos():
     except requests.exceptions.RequestException as erro:
         logging.warning("listar_modelos falhou: %s", erro)
         return []
+
+
+def listar_modelos_disco():
+    """Os checkpoints lidos DIRETO da pasta do Forge (models/Stable-diffusion) —
+    serve pra você escolher o modelo mesmo com o Forge FECHADO (o listar_modelos
+    via API só responde com ele aberto). Devolve os NOMES de arquivo (com extensão,
+    como o Forge nomeia no título). Vazio se a pasta não existir."""
+    if not PASTA_CHECKPOINTS.exists():
+        return []
+    nomes = [arq.name for arq in PASTA_CHECKPOINTS.rglob("*")
+             if arq.suffix.lower() in (".safetensors", ".ckpt")]
+    return sorted(nomes)
 
 
 def modelo_atual():

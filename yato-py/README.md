@@ -613,6 +613,14 @@ O projeto evolui em **rodadas** — cada uma vira um commit com nome claro.
       nome + chips de modelo/LoRA por cima num degradê, 4 cards grandes por página
       (o degradê é assado na miniatura — o Tk não compõe transparência sobre imagem)
 
+### ✅ Rodada 15 — polimento de UX da aba Imagem
+- [x] **Escolher o modelo com o Forge FECHADO**: o seletor lê os checkpoints
+      direto da pasta (`listar_modelos_disco`); o modelo escolhido carrega sozinho
+      na hora de gerar (`_aplicar_modelo_desejado`, depois do Forge subir)
+- [x] **Dropdowns dentro da janela** (`DropdownInterno`): tamanho/modelo/LoRA
+      abriam um menu nativo do Tk que "vazava" pra fora; agora abrem um cartão
+      clampado na janela (mesmo padrão do menu ⋮), que fecha no clique-fora
+
 ### 💡 Depois (sem número ainda)
 - [ ] Sugerir o checkpoint/LoRA que combina com a imagem (via descrição do Civitai)
 - [ ] Variações mais distintas (hoje o 7B mais reformula que reinventa)

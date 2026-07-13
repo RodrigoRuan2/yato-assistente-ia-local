@@ -106,6 +106,111 @@ def limpar_markdown(texto):
     return texto.strip()
 
 
+class DropdownInterno(ctk.CTkButton):
+    """Um seletor no lugar do CTkOptionMenu — mas cuja lista abre num CARTÃO
+    DENTRO da janela (place + lift), em vez do menu NATIVO do Tk, que "vaza" pra
+    fora da janela e só fecha clicando fora. Mesma ideia do menu ⋮.
+
+    API compatível com CTkOptionMenu: `get()`, `set(v)`, `configure(values=…)`,
+    `cget("values")` — pra trocar sem mexer em quem usa. O cartão se posiciona
+    logo abaixo do botão e é CLAMPADO na janela (se não cabe embaixo, abre pra
+    cima; se passa da direita, encosta na borda)."""
+
+    def __init__(self, master, values=None, command=None, width=140, **kw):
+        self._valores = list(values or [])
+        self._comando = command
+        self._valor = self._valores[0] if self._valores else ""
+        self._cartao = None
+        self._fechado_em = 0.0
+        self._bind_id = None
+        super().__init__(master, width=width, anchor="w",
+                         text=self._rotulo(self._valor), command=self._toggle, **kw)
+
+    def _rotulo(self, v):
+        return f"{v}   ▾"
+
+    def get(self):
+        return self._valor
+
+    def set(self, valor):
+        self._valor = valor
+        super().configure(text=self._rotulo(valor))
+
+    def cget(self, key):
+        return self._valores if key == "values" else super().cget(key)
+
+    def configure(self, **kw):
+        if "values" in kw:
+            self._valores = list(kw.pop("values"))
+        if "command" in kw:
+            self._comando = kw.pop("command")
+        if kw:
+            super().configure(**kw)
+
+    def _toggle(self):
+        if self._cartao is not None:
+            self._fechar()
+        elif time.monotonic() - self._fechado_em >= 0.25:   # não reabre no mesmo clique
+            self._abrir()
+
+    def _abrir(self):
+        if not self._valores:
+            return
+        topo = self.winfo_toplevel()
+        cartao = ctk.CTkFrame(
+            topo, corner_radius=10,
+            fg_color=ctk.ThemeManager.theme["CTkFrame"]["fg_color"],
+            border_width=1, border_color=("gray60", "#5c5c6a"))
+        for v in self._valores:
+            marcado = (v == self._valor)
+            ctk.CTkButton(
+                cartao, text=("✓  " if marcado else "     ") + v, anchor="w",
+                height=28, corner_radius=6, fg_color="transparent",
+                hover_color=("gray82", "#3a3a46"), text_color=("gray10", "#e6e6f0"),
+                font=ctk.CTkFont(size=11),
+                command=lambda vv=v: self._escolher(vv)).pack(fill="x", padx=6, pady=1)
+        self._cartao = cartao
+        cartao.update_idletasks()
+        bx = self.winfo_rootx() - topo.winfo_rootx()
+        by = self.winfo_rooty() - topo.winfo_rooty()
+        cw, ch = cartao.winfo_reqwidth(), cartao.winfo_reqheight()
+        x = max(4, min(bx, topo.winfo_width() - cw - 4))          # não vaza à direita
+        y = by + self.winfo_height() + 3
+        if y + ch > topo.winfo_height() - 4:                       # não cabe embaixo → abre pra cima
+            y = max(4, by - ch - 3)
+        cartao.place(x=x, y=y)
+        cartao.lift()
+        self._bind_id = topo.bind("<Button-1>", self._clique_fora, add="+")
+
+    def _escolher(self, v):
+        self.set(v)
+        self._fechar()
+        if self._comando:
+            self._comando(v)
+
+    def _clique_fora(self, evento):
+        cartao = self._cartao
+        if cartao is None:
+            return
+        w = evento.widget
+        while w is not None:                 # clicou dentro do cartão ou no botão? ignora
+            if w is cartao or w is self:
+                return
+            w = getattr(w, "master", None)
+        self._fechar()
+
+    def _fechar(self):
+        if self._cartao is None:
+            return
+        topo = self.winfo_toplevel()
+        if self._bind_id:
+            topo.unbind("<Button-1>", self._bind_id)
+            self._bind_id = None
+        self._cartao.destroy()
+        self._cartao = None
+        self._fechado_em = time.monotonic()
+
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -633,7 +738,8 @@ class App(ctk.CTk):
         topo.pack(fill="x", pady=(0, 8))
         ctk.CTkLabel(topo, text="Modelo:", font=ctk.CTkFont(size=12)).pack(side="left")
         self._modelos_disponiveis = {}
-        self.seletor_modelo_imagem = ctk.CTkOptionMenu(
+        self._modelo_desejado = None   # modelo que você escolheu (aplica ao gerar)
+        self.seletor_modelo_imagem = DropdownInterno(
             topo, values=["(carregando…)"], width=240,
             command=self._trocar_modelo_click,
         )
@@ -642,8 +748,8 @@ class App(ctk.CTk):
             topo, text="🔄", width=32, fg_color="transparent", border_width=1,
             command=self._atualizar_lista_modelos,
         ).pack(side="left")
-        self.seletor_tamanho = ctk.CTkOptionMenu(
-            topo, values=list(TAMANHOS_IMAGEM.keys()), width=104,
+        self.seletor_tamanho = DropdownInterno(
+            topo, values=list(TAMANHOS_IMAGEM.keys()), width=112,
             font=ctk.CTkFont(size=11),
         )
         self.seletor_tamanho.set("Quadrado")
@@ -688,8 +794,8 @@ class App(ctk.CTk):
         linha_lora.pack(fill="x", pady=(14, 0))
         ctk.CTkLabel(linha_lora, text="LoRA:", font=ctk.CTkFont(size=11),
                      text_color="#8a8aa0").pack(side="left", padx=(8, 4), pady=6)
-        self.seletor_lora = ctk.CTkOptionMenu(
-            linha_lora, values=["(nenhum)"], width=132, font=ctk.CTkFont(size=11))
+        self.seletor_lora = DropdownInterno(
+            linha_lora, values=["(nenhum)"], width=140, font=ctk.CTkFont(size=11))
         self.seletor_lora.pack(side="left", pady=6)
         ctk.CTkButton(linha_lora, text="➕", width=30,
                       command=self._adicionar_lora).pack(side="right", padx=(4, 8), pady=6)
@@ -1370,6 +1476,9 @@ class App(ctk.CTk):
             #    boot antes de desenhar. Se não der, _garantir_forge já avisou.
             if not self._garantir_forge():
                 return
+            # 2.5) Aplica o modelo que você escolheu (se escolheu com o Forge
+            #      fechado, é AGORA que ele carrega — antes de desenhar).
+            self._aplicar_modelo_desejado()
             # Reafirma o status de "desenhando" (o _garantir_forge pode ter
             # deixado o aviso de "abrindo o Forge" na tela).
             self.after(0, lambda: self.status_imagem.configure(
@@ -1497,10 +1606,18 @@ class App(ctk.CTk):
 
     def _lista_modelos_pronta(self, modelos, atual):
         if not modelos:
-            self.seletor_modelo_imagem.configure(values=["(Forge fechado)"])
-            self.seletor_modelo_imagem.set("(Forge fechado)")
-            self.status_imagem.configure(
-                text="Forge fechado — o Yato abre sozinho quando você gerar.")
+            # Forge fechado: lê os checkpoints DO DISCO pra você já poder escolher
+            # (o modelo escolhido carrega sozinho na hora de gerar).
+            disco = imagem.listar_modelos_disco()
+            if disco:
+                self._preencher_seletor_modelos(disco, None)
+                self.status_imagem.configure(
+                    text="Forge fechado — escolha o modelo; ele carrega ao gerar.")
+            else:
+                self.seletor_modelo_imagem.configure(values=["(Forge fechado)"])
+                self.seletor_modelo_imagem.set("(Forge fechado)")
+                self.status_imagem.configure(
+                    text="Forge fechado — o Yato abre sozinho quando você gerar.")
             return
         self._preencher_seletor_modelos(modelos, atual)
         self.status_imagem.configure(
@@ -1516,15 +1633,27 @@ class App(ctk.CTk):
         self._modelos_disponiveis = {self._nome_amigavel_modelo(t): t for t in modelos}
         nomes = list(self._modelos_disponiveis.keys())
         self.seletor_modelo_imagem.configure(values=nomes)
-        # Marca no seletor o que já está carregado de fato no Forge (pode ter
-        # sido trocado por fora, direto na WebUI).
-        nome_atual = next((n for n, t in self._modelos_disponiveis.items()
-                           if atual and t.startswith(atual)), nomes[0])
-        self.seletor_modelo_imagem.set(nome_atual)
+        # Qual marcar: a sua escolha pendente > o que está carregado no Forge >
+        # o primeiro. (Assim, escolher com o Forge fechado não é atropelado quando
+        # a lista é repopulada depois do boot.)
+        if self._modelo_desejado in self._modelos_disponiveis:
+            alvo = self._modelo_desejado
+        else:
+            alvo = next((n for n, t in self._modelos_disponiveis.items()
+                         if atual and t.startswith(atual)), nomes[0])
+        self.seletor_modelo_imagem.set(alvo)
 
     def _trocar_modelo_click(self, nome_amigavel):
-        """Chamado pelo seletor: troca o checkpoint ativo no Forge (demora —
-        roda numa thread)."""
+        """Chamado pelo seletor. Se o Forge está aberto, troca o checkpoint na
+        hora (demora — numa thread). Se está FECHADO, só GUARDA a escolha — ela é
+        aplicada sozinha quando você gerar (aí o Forge já vai estar de pé)."""
+        if nome_amigavel.startswith("("):     # placeholders "(carregando…)" etc.
+            return
+        self._modelo_desejado = nome_amigavel
+        if not imagem.disponivel():
+            self.status_imagem.configure(
+                text=f"🎯 {nome_amigavel} escolhido — carrega quando você gerar.")
+            return
         titulo = self._modelos_disponiveis.get(nome_amigavel)
         if not titulo:
             return
@@ -1539,6 +1668,26 @@ class App(ctk.CTk):
                 self.after(0, lambda: self.status_imagem.configure(text=str(erro)))
 
         threading.Thread(target=trabalhar, daemon=True).start()
+
+    def _aplicar_modelo_desejado(self):
+        """(dentro da thread de gerar, Forge já no ar) Se você escolheu um modelo
+        diferente do carregado, troca ANTES de desenhar. Resolve o nome amigável
+        pro título real (só disponível com o Forge aberto)."""
+        if not self._modelo_desejado:
+            return
+        atual = imagem.modelo_atual()
+        if atual and self._nome_amigavel_modelo(atual) == self._modelo_desejado:
+            return                              # já é o carregado
+        alvo = next((t for t in imagem.listar_modelos()
+                     if self._nome_amigavel_modelo(t) == self._modelo_desejado), None)
+        if not alvo:
+            return
+        self.after(0, lambda: self.status_imagem.configure(
+            text=f"🔄 carregando {self._modelo_desejado}… (~30s)"))
+        try:
+            imagem.trocar_modelo(alvo)
+        except imagem.ImagemError as erro:
+            self.after(0, lambda e=erro: self.status_imagem.configure(text=str(e)))
 
     def _redesenhar_conversa(self):
         """Limpa a área e redesenha as bolhas a partir de self.mensagens.
