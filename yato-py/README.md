@@ -437,6 +437,47 @@ Pré-requisito: **instalar o Forge** e deixar a flag `--api` no `webui-user.bat`
 (o Yato o abre sozinho, mas precisa do `--api` pra falar com ele). Ele é pesado e
 roda na GPU; não vem com o `preparar.py` (é um projeto externo, instalado à parte).
 
+### Baixar modelos e LoRAs (passo a passo) 📥
+
+O Yato **não vem com modelos de imagem** — você baixa os que quiser. A fonte
+principal é o **[Civitai](https://civitai.com)** (grátis; algumas coisas pedem
+conta pra baixar). Cada arquivo tem seu lugar **na pasta do Forge** (o `<Forge>`
+é o caminho que você apontou na variável `YATO_FORGE`):
+
+| O quê | Onde vai |
+| ----- | -------- |
+| **Checkpoint** (o modelo/estilo base) | `<Forge>/models/Stable-diffusion/` |
+| **LoRA** (um ajuste de estilo por cima) | `<Forge>/models/Lora/` |
+
+**⚠️ A regra nº 1 — família base (compatibilidade):** todo modelo/LoRA pertence a
+uma **família** (SD 1.5, SDXL, Pony, Illustrious, Flux…). Um LoRA só funciona bem
+num checkpoint da **mesma família**. **Illustrious, SDXL e Pony conversam entre si**
+(são todos SDXL); **SD 1.5, Flux e outros NÃO** conversam com esses. Na página do
+Civitai, olhe o campo **Base Model** — é ele que decide. Os seus modelos hoje são
+Illustrious, então fique em LoRAs **Illustrious/SDXL/Pony**.
+
+**Baixar um checkpoint (modelo):**
+1. Entre no [civitai.com](https://civitai.com) e procure um modelo (ex.: *Nova Anime XL*).
+   Dá pra filtrar por **Checkpoint** + **Base Model: Illustrious** (pra bater com os seus).
+2. Veja as **imagens de exemplo** na página pra sentir o estilo.
+3. Clique em **Download** — vem um arquivo **`.safetensors`** (vários GB).
+4. Ponha o arquivo em **`<Forge>/models/Stable-diffusion/`**.
+5. No Yato, aba **Imagem**, clique no **🔄** ao lado de *Modelo* (ou só abra o
+   seletor) — o modelo novo aparece. O Yato lê a pasta **mesmo com o Forge fechado**.
+
+**Baixar um LoRA (estilo):**
+1. No Civitai, filtre por **LoRA** + a mesma **Base Model** do seu checkpoint.
+2. Baixe o **`.safetensors`** (LoRAs são pequenos, ~50–300 MB).
+3. Ponha em **`<Forge>/models/Lora/`**.
+4. No Yato, o LoRA aparece no **seletor de LoRA**. Ao adicionar (**➕**), o Yato
+   busca a **palavra-gatilho** no Civitai e injeta sozinho no prompt.
+
+**Dicas:**
+- Baixou e não apareceu? Confira se caiu na pasta **certa** e clique no 🔄.
+- Modelos/LoRAs ficam **na pasta do Forge, fora do repositório do Yato** — não
+  vão pro GitHub (são pesados e têm licença própria).
+- Peso do LoRA (o slider, 0–1.0): comece em ~0.8; se "queimar" a imagem, baixe.
+
 ## Se algo der errado
 
 - O Yato responde com mensagens diferentes pra cada problema: Ollama fechado,
@@ -629,6 +670,21 @@ O projeto evolui em **rodadas** — cada uma vira um commit com nome claro.
       "digital/anime", não pega estilo fino). A recomendação por IMAGEM ficaria
       quieta quase sempre — então o código fica **guardado** pra quando houver um
       olho melhor, ou pra virar "você escolhe o estilo → sugiro a LoRA".
+
+### ✅ Rodada 17 — qualidade/resolução 🖼️
+- [x] Resolução base no **sweet spot do SDXL** (~1024px): Quadrado 1024×1024,
+      Retrato 832×1216, Paisagem 1216×832 (antes 768, abaixo do treino → mais mole)
+- [x] Interruptor **✨ Alta res. (hires fix)**: 2º passe que amplia ~1.5× e
+      detalha (`enable_hr` + `Latent` + denoise 0.5) — nítido pra wallpaper, mas
+      ~2× mais lento e pesado; desligado por padrão. Números afináveis no `gerar()`
+
+### ✅ Rodada 18 — autocomplete de personagem (Danbooru) 🔎
+- [x] `imagem.buscar_personagens_danbooru`: enquanto você digita no campo
+      Personagem, busca as tags REAIS no Danbooru (a fonte em que os modelos de
+      anime foram treinados) — com a **contagem de imagens** de cada uma
+- [x] Dropdown no campo (debounce + thread + poller, dentro da janela): você
+      clica na tag certa (`monkey d. luffy`, não `luffy`) e vê a "fama" (quanto
+      maior a contagem, melhor o modelo desenha). Conserta o chute do 7B na raiz
 
 ### 💡 Depois (sem número ainda)
 - [ ] Recomendar LoRA no modo "você escolhe o estilo" (tira o olho do caminho)

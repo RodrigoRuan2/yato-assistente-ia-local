@@ -65,10 +65,12 @@ DICAS_MODO = {
 # cabem nos 8 GB de VRAM e cobrem os casos comuns. Um preset "lembra" o tamanho
 # em que foi feito (vem embutido no PNG), então ao escolher um favorito o seletor
 # já se ajusta sozinho.
+# Resoluções no "sweet spot" do SDXL (~1024px de lado) — gerar abaixo disso
+# (ex.: 768) deixa a imagem mais mole. Proporções recomendadas do SDXL.
 TAMANHOS_IMAGEM = {
-    "Quadrado": (768, 768),
-    "Retrato": (768, 1152),
-    "Paisagem": (1152, 768),
+    "Quadrado": (1024, 1024),
+    "Retrato": (832, 1216),
+    "Paisagem": (1216, 832),
 }
 
 # ---- Diário de bordo (yato.log, criado ao lado deste arquivo) ----
@@ -756,6 +758,11 @@ class App(ctk.CTk):
         self.seletor_tamanho.pack(side="right")
         ctk.CTkLabel(topo, text="Tamanho:",
                      font=ctk.CTkFont(size=11)).pack(side="right", padx=(0, 6))
+        # ✨ Alta resolução (hires fix): 2º passe que amplia e detalha. Mais lento
+        # e pesado — desligado por padrão; ligue pra wallpaper.
+        self.switch_hires = ctk.CTkSwitch(topo, text="✨ Alta res.",
+                                          font=ctk.CTkFont(size=11))
+        self.switch_hires.pack(side="right", padx=(0, 14))
 
         # ---- CORPO: duas colunas (controles | painel de abas) ----
         corpo = ctk.CTkFrame(v, fg_color="transparent")
@@ -775,6 +782,10 @@ class App(ctk.CTk):
             col_esq, height=36,
             placeholder_text="gojo, rias gremory, uma garota de cabelo azul…")
         self.campo_personagem.pack(fill="x", pady=(0, 16))
+        # Autocomplete de personagem com as tags REAIS do Danbooru (nome certo +
+        # contagem de imagens = quão bem o modelo desenha). Enquanto você digita.
+        self._ac_after = self._ac_card = self._ac_resultado = self._ac_bind = None
+        self.campo_personagem.bind("<KeyRelease>", self._ac_ao_digitar)
 
         ctk.CTkLabel(col_esq, text="Prompt (inglês — pode editar antes de gerar):",
                      font=ctk.CTkFont(size=12), anchor="w").pack(fill="x", pady=(0, 4))
@@ -1319,6 +1330,113 @@ class App(ctk.CTk):
         self.campo_prompt.insert("1.0", prompt)
         self.status_imagem.configure(text="Prompt pronto — revise e gere quando quiser.")
 
+    # ---- Autocomplete de personagem (tags reais do Danbooru) ----
+    def _ac_ao_digitar(self, evento):
+        """Cada tecla no campo Personagem dispara a busca — com um respiro
+        (debounce de 300ms) pra não bater no Danbooru a cada letra. Esc fecha;
+        setas/enter não disparam."""
+        if evento.keysym == "Escape":
+            self._ac_fechar()
+            return
+        if evento.keysym in ("Up", "Down", "Left", "Right", "Return", "Tab", "Shift_L",
+                             "Shift_R", "Control_L", "Control_R"):
+            return
+        if self._ac_after:
+            self.after_cancel(self._ac_after)
+        self._ac_after = self.after(300, self._ac_disparar)
+
+    def _ac_disparar(self):
+        texto = self.campo_personagem.get().strip()
+        if len(texto) < 2:
+            self._ac_fechar()
+            return
+        self._ac_resultado = None
+        threading.Thread(target=self._ac_buscar, args=(texto,), daemon=True).start()
+        self.after(120, lambda: self._ac_checar(texto))
+
+    def _ac_buscar(self, texto):
+        """(thread) Só busca no Danbooru e guarda — não toca na UI."""
+        self._ac_resultado = (texto, imagem.buscar_personagens_danbooru(texto))
+
+    def _ac_checar(self, texto):
+        """(thread principal) Mostra a lista quando a busca volta — se o campo
+        ainda tiver o mesmo texto (senão era uma busca velha, ignora)."""
+        res = self._ac_resultado
+        if res is None:
+            self.after(120, lambda: self._ac_checar(texto))
+            return
+        query, itens = res
+        if query != self.campo_personagem.get().strip():
+            return
+        if itens:
+            self._ac_mostrar(itens)
+        else:
+            self._ac_fechar()
+
+    @staticmethod
+    def _fmt_contagem(n):
+        return f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+
+    def _ac_mostrar(self, itens):
+        """Desenha o cartão de sugestões logo abaixo do campo (dentro da janela):
+        cada linha = a tag + a contagem de imagens. Clicar preenche o campo."""
+        self._ac_fechar()
+        topo = self.winfo_toplevel()
+        card = ctk.CTkFrame(
+            topo, corner_radius=8,
+            fg_color=ctk.ThemeManager.theme["CTkFrame"]["fg_color"],
+            border_width=1, border_color=("gray60", "#5c5c6a"))
+        for it in itens:
+            linha = ctk.CTkFrame(card, fg_color="transparent", height=36)
+            linha.pack(fill="x", padx=5, pady=2)
+            linha.pack_propagate(False)          # respeita a altura maior
+            lbl_tag = ctk.CTkLabel(linha, text=it["tag"], font=ctk.CTkFont(size=15),
+                                   text_color=("gray10", "#e6e6f0"), anchor="w")
+            lbl_tag.pack(side="left", padx=(10, 0))
+            lbl_cnt = ctk.CTkLabel(linha, text=self._fmt_contagem(it["count"]),
+                                   font=ctk.CTkFont(size=13, weight="bold"),
+                                   text_color="#7fb0d4")
+            lbl_cnt.pack(side="right", padx=(0, 12))
+            for w in (linha, lbl_tag, lbl_cnt):
+                w.bind("<Button-1>", lambda e, t=it["tag"]: self._ac_escolher(t))
+                w.bind("<Enter>", lambda e, ln=linha: ln.configure(fg_color=("gray82", "#3a3a46")))
+                w.bind("<Leave>", lambda e, ln=linha: ln.configure(fg_color="transparent"))
+        self._ac_card = card
+        card.update_idletasks()
+        bx = self.campo_personagem.winfo_rootx() - topo.winfo_rootx()
+        by = self.campo_personagem.winfo_rooty() - topo.winfo_rooty()
+        # largura mínima = a do campo (o cartão cresce se a tag for mais longa)
+        card.configure(width=self.campo_personagem.winfo_width())
+        card.place(x=bx, y=by + self.campo_personagem.winfo_height() + 2)
+        card.lift()
+        self._ac_bind = topo.bind("<Button-1>", self._ac_clique_fora, add="+")
+
+    def _ac_escolher(self, tag):
+        self.campo_personagem.delete(0, "end")
+        self.campo_personagem.insert(0, tag)
+        self._ac_fechar()
+
+    def _ac_clique_fora(self, evento):
+        card = self._ac_card
+        if card is None:
+            return
+        w = evento.widget
+        while w is not None:
+            if w is card or w is self.campo_personagem:
+                return
+            w = getattr(w, "master", None)
+        self._ac_fechar()
+
+    def _ac_fechar(self):
+        if self._ac_card is None:
+            return
+        topo = self.winfo_toplevel()
+        if self._ac_bind:
+            topo.unbind("<Button-1>", self._ac_bind)
+            self._ac_bind = None
+        self._ac_card.destroy()
+        self._ac_card = None
+
     # ---- Prompt a partir de uma imagem (visão → tags → moldes) ----
     def _colar_ref(self, _evento):
         """Ctrl+V no campo de prompt: se o clipboard tem IMAGEM, vira referência
@@ -1459,7 +1577,10 @@ class App(ctk.CTk):
             return
         pedido = self.campo_personagem.get().strip()
         larg, alt = TAMANHOS_IMAGEM[self.seletor_tamanho.get()]
-        self.status_imagem.configure(text="🎨 desenhando… (pode levar uns 20-30s)")
+        hires = bool(self.switch_hires.get())   # lê o switch AQUI (thread da UI)
+        aviso_desenho = ("🎨 desenhando em alta resolução… (mais lento, ~1min)"
+                         if hires else "🎨 desenhando… (pode levar uns 20-30s)")
+        self.status_imagem.configure(text=aviso_desenho)
 
         def trabalhar():
             # 1) Traduz o personagem (se houver) e encaixa no slot {personagem}.
@@ -1481,11 +1602,10 @@ class App(ctk.CTk):
             self._aplicar_modelo_desejado()
             # Reafirma o status de "desenhando" (o _garantir_forge pode ter
             # deixado o aviso de "abrindo o Forge" na tela).
-            self.after(0, lambda: self.status_imagem.configure(
-                text="🎨 desenhando… (pode levar uns 20-30s)"))
-            # 3) Desenha (no tamanho/proporção escolhido).
+            self.after(0, lambda: self.status_imagem.configure(text=aviso_desenho))
+            # 3) Desenha (no tamanho/proporção escolhido, com hires se ligado).
             try:
-                caminho = imagem.gerar(prompt, largura=larg, altura=alt)
+                caminho = imagem.gerar(prompt, largura=larg, altura=alt, hires=hires)
                 self.after(0, lambda: self._imagem_pronta(caminho, prompt))
             except imagem.ImagemError as erro:
                 self.after(0, lambda: self.status_imagem.configure(text=str(erro)))

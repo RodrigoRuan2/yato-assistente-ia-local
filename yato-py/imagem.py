@@ -40,6 +40,7 @@ from cerebro import OLLAMA_URL, MODELO
 
 FORGE_URL = "http://127.0.0.1:7860"
 CIVITAI_API = "https://civitai.com/api/v1"
+DANBOORU_URL = "https://danbooru.donmai.us"
 PASTA_IMAGENS = Path(__file__).with_name("imagens_geradas")
 # Cache no disco das trigger words dos LoRAs (nome -> {"trigger": "..."}). Cada
 # LoRA é hasheado e consultado no Civitai UMA vez; depois vem daqui, instantâneo.
@@ -534,6 +535,37 @@ def melhorar_prompt(descricao_pt):
     return texto
 
 
+def buscar_personagens_danbooru(query, limite=8):
+    """Autocomplete de PERSONAGEM no Danbooru — a MESMA fonte em que os modelos de
+    anime (Illustrious/SDXL) foram treinados. Devolve [{tag, count}]: a tag JÁ com
+    espaços (como vai no prompt) e a contagem de imagens (o quanto o modelo
+    'conhece' o personagem = quão bem vai desenhar). Só tags de personagem
+    (category 4). Lista vazia se a busca é curta demais ou falhou (offline) — NUNCA
+    levanta erro; é um extra em cima do campo de texto."""
+    query = (query or "").strip()
+    if len(query) < 2:
+        return []
+    try:
+        r = requests.get(
+            f"{DANBOORU_URL}/autocomplete.json",
+            params={"search[query]": query, "search[type]": "tag_query", "limit": 20},
+            headers={"User-Agent": "yato/1.0"}, timeout=8)
+        r.raise_for_status()
+        dados = r.json()
+    except (requests.exceptions.RequestException, ValueError):
+        return []
+    saida = []
+    for it in dados:
+        if it.get("category") != 4:              # 4 = personagem (ignora artista/etc.)
+            continue
+        tag = (it.get("value") or "").replace("_", " ")
+        if tag:
+            saida.append({"tag": tag, "count": it.get("post_count", 0)})
+        if len(saida) >= limite:
+            break
+    return saida
+
+
 def personagem_para_tags(pedido_pt):
     """Traduz UM personagem (em português) pra a tag booru canônica que entra no
     slot {personagem} de um preset. Ex.: "gojo" -> "gojo satoru, jujutsu kaisen,
@@ -709,27 +741,62 @@ def prompt_de_imagem(imagem_b64, n=3):
     return sugestoes
 
 
-def gerar(prompt, negativo=None, passos=25, largura=768, altura=768):
+def _detalhe_erro_forge(resposta):
+    """O MOTIVO que o Forge mandou no CORPO do erro. O status sozinho ("500") não
+    diz nada; o corpo traz o que ele não engoliu (parâmetro inválido, OOM…)."""
+    try:
+        dados = resposta.json()
+    except (ValueError, AttributeError):
+        return (getattr(resposta, "text", "") or "")[:200]
+    for chave in ("detail", "error", "errors", "msg"):
+        if dados.get(chave):
+            return str(dados[chave])[:200]
+    return str(dados)[:200]
+
+
+def gerar(prompt, negativo=None, passos=25, largura=1024, altura=1024, hires=False):
     """Gera a imagem: libera a VRAM do Ollama, chama o Forge, salva o PNG em
-    imagens_geradas/ e devolve o Path do arquivo."""
+    imagens_geradas/ e devolve o Path do arquivo.
+
+    hires=True liga o "hires fix": gera na base e faz um 2º passe que AMPLIA
+    (~1.5x) e adiciona detalhe — imagem maior e mais nítida (ótimo pra wallpaper),
+    mas ~2x mais lenta e mais pesada na VRAM. Os números (escala, upscaler,
+    denoise) são um ponto de partida — dá pra afinar aqui."""
     if not prompt or not prompt.strip():
         raise ImagemError("Sem prompt pra gerar — escreva ou melhore uma descrição antes.")
 
     liberar_vram_ollama()
 
+    payload = {
+        "prompt": prompt,
+        "negative_prompt": negativo or NEGATIVO_PADRAO,
+        "steps": passos,
+        "width": largura,
+        "height": altura,
+        "cfg_scale": CFG_PADRAO,
+    }
+    if hires:
+        payload.update({
+            "enable_hr": True,
+            "hr_scale": 1.5,          # 1024 -> ~1536; se der OOM nos 8GB, baixe
+            # O Forge NÃO tem os upscalers "Latent" do A1111 antigo — passar um
+            # nome inválido quebra ele. Esse é o melhor pra anime.
+            "hr_upscaler": "R-ESRGAN 4x+ Anime6B",
+            "hr_second_pass_steps": 15,
+            "denoising_strength": 0.35,   # upscaler ESRGAN pede denoise BAIXO
+            # PEGADINHA DO FORGE: campo só dele, que vem None por padrão — e o
+            # Forge faz `'Use same choices' not in self.hr_additional_modules`
+            # (processing.py:1405). Com None, todo hires morre em 500
+            # "argument of type 'NoneType' is not iterable". Este é o padrão da
+            # UI dele: o 2º passe usa os MESMOS módulos (VAE etc.) do modelo base.
+            "hr_additional_modules": ["Use same choices"],
+        })
+
     try:
         r = requests.post(
-            f"{FORGE_URL}/sdapi/v1/txt2img",
-            json={
-                "prompt": prompt,
-                "negative_prompt": negativo or NEGATIVO_PADRAO,
-                "steps": passos,
-                "width": largura,
-                "height": altura,
-                "cfg_scale": CFG_PADRAO,
-            },
-            # A geração de imagem demora (~15-30s no SDXL); generoso de propósito.
-            timeout=180,
+            f"{FORGE_URL}/sdapi/v1/txt2img", json=payload,
+            # geração normal ~15-30s; com hires o 2º passe dobra — timeout maior.
+            timeout=400 if hires else 180,
         )
         r.raise_for_status()
     except requests.exceptions.ConnectionError:
@@ -737,6 +804,12 @@ def gerar(prompt, negativo=None, passos=25, largura=768, altura=768):
             "O Forge está fechado 🎨💤 (abra o webui-user.bat com --api e tenta de novo)")
     except requests.exceptions.Timeout:
         raise ImagemError("Demorou demais pra desenhar 😵 Tenta de novo?")
+    except requests.exceptions.HTTPError as erro:
+        # O Forge manda o MOTIVO no corpo da resposta — sem ler isso, um "500"
+        # não diz nada e a gente fica no escuro (foi o que aconteceu no hires).
+        detalhe = _detalhe_erro_forge(r)
+        logging.warning("gerar (Forge) falhou: %s | resposta: %s", erro, detalhe)
+        raise ImagemError(f"O Forge recusou: {detalhe or 'erro sem detalhe'}")
     except requests.exceptions.RequestException as erro:
         logging.warning("gerar (Forge) falhou: %s", erro)
         raise ImagemError("O Forge reclamou de alguma coisa — confira o terminal dele.")
