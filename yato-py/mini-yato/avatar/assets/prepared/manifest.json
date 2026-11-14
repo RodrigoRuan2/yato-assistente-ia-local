@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "width": 384,
+  "columns": 4,
+  "prepared": {
+    "cycleRestFrames.png": "533a38223946ae29054b16765a8c300473e43a73bff32ae34af697a1e23ea2b9",
+    "approvedRestFrames.png": "ff93e3854fcece389a199ec0f9d9d4a153f415592ea6dfa7d801d1c3a7e58670",
+    "reactionFrames.png": "708d9750b5aea8d99efe16bf241b10f564140dfbb5590e21493f57151d9ff3fe",
+    "neutral.png": "c2097031e96aac9a41cbc671c43e74ef3f9c369c6aa99d9d379ec89460566d2d",
+    "walkFrames.png": "0fbbb3afd077f7c5737de66d23bdaad25712a5d53a36390ac46b59eccff07d0e",
+    "frames.png": "afca2751986c69bd98334c2df6daf9926df27bf92560c61fdd6d1bdf5db1f4b0",
+    "cycleFrames.png": "6b4c71267b4f4eef191c44ad7d73bb128b5919751dbe7689ea3553eee0cdfeeb",
+    "approvedCycleFrames.png": "2d530c9ea8f181074ce91441999d1b14bb5c98cffe1bf167145b2e5efc213130"
+  },
+  "height": 560,
+  "sources": {
+    "yato-chibi-sprites-v1.png": "71ecb31c85a7837a9731cb3f2d00690655fdec5229699f5c1f451754437e0989",
+    "yato-chibi-reacoes-v1.png": "8f5c0ef4f8c240225c591ede0c681c3f662899521ecead7a79a1ae5aad891cb7",
+    "yato-caminhada-bracos-v3.png": "a5a6240896d1c30282d802c23ef09463f16c72dd67b043dcc58343ad404c849f",
+    "yato-caminhada-lateral-v1.png": "e1ec0f1367b86f344bd35aae89e27d31d37418c0ef94cfc8c24b2f3e218aa935",
+    "yato-caminhada-ciclo-v2.png": "a24778782e06969eb17c98a0c103288b2565bfe4ca8a0464145650a45aab2eaf"
+  }
+}

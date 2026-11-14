@@ -1,0 +1,15 @@
+data/
+runtime/config.json
+runtime/fatos.json
+runtime/conversas/
+__pycache__/
+*.pyc
+*.log
+*.err
+qa/*.json
+qa/*.png
+qa/*.flag
+qa/*.txt
+avatar/preservacao.json
+avatar/assets/fala-demo.wav
+avatar/assets/fala-demo.json

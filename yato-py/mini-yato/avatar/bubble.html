@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Yato · Balão</title>
+  <link rel="stylesheet" href="bubble.css">
+  <script defer src="bubble-renderer.js"></script>
+</head>
+<body>
+  <section class="bubble" id="bubble" aria-label="Mensagem do Yato">
+    <header><span class="identity"><i></i>YATO</span><span id="kind">POR AQUI</span><button id="close" aria-label="Fechar balão" title="Fechar balão">×</button></header>
+    <div id="message" role="status" aria-live="polite" aria-atomic="true"></div>
+    <button id="expand" type="button" aria-expanded="false" hidden>Ler tudo ↓</button>
+    <div id="source-row" hidden><span id="source-label"></span><button id="source" type="button">Ver fonte ↗</button></div>
+    <button id="compose" class="compose">Falar com o Yato</button>
+    <form id="command-form" hidden>
+      <label for="command-input">Mensagem para o Yato</label>
+      <div class="command-row"><input id="command-input" maxlength="2000" autocomplete="off" placeholder="Fala comigo…"><button id="send-command" type="submit" aria-label="Enviar mensagem">↑</button></div>
+      <small>Conversa com o Yato · pedidos e cálculos</small>
+    </form>
+    <footer id="pagination" hidden><button id="previous" aria-label="Página anterior" title="Página anterior">←</button><span id="page"></span><button id="next" aria-label="Próxima página" title="Próxima página">→</button></footer>
+    <span class="tail" aria-hidden="true"></span>
+  </section>
+</body>
+</html>

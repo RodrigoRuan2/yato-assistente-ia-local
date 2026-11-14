@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yato · Beta-2 LAB</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="motion.js" defer></script>
+  <script src="effects.js" defer></script>
+  <script src="avatar.js" defer></script>
+</head>
+<body>
+  <main class="studio">
+    <header><a class="brand" href="#">Y<span>Λ</span>TO <small>BETA—2 LAB</small></a><span class="edition">ANIMAÇÕES EM DESENVOLVIMENTO <i>BETA-1 PRESERVADO</i></span></header>
+    <section class="intro"><div><p class="eyebrow">O MESMO YATO. MAIS EXPRESSÃO.</p><h1>Ele está ganhando vida<span>.</span></h1><p class="lead">Pequenos gestos, primeiras reações e a mesma personalidade no olhar.</p></div><span class="version">LABORATÓRIO INDEPENDENTE<br><b>Visual beta-1 · animação experimental</b></span></section>
+    <section class="workspace">
+      <div class="stage" id="stage">
+        <div class="stage-label"><span class="dot"></span><span id="status" role="status">Carregando arte…</span></div>
+        <span class="stage-note">YATO / CORPO INTEIRO</span>
+        <div class="ground"></div>
+        <canvas id="avatar" aria-label="Yato chibi animado de corpo inteiro"></canvas>
+        <div class="caption"><span id="action-label">Presença tranquila.</span><small>Beta-1 preservado · laboratório independente</small></div>
+        <div class="backgrounds" aria-label="Fundo do palco"><button data-bg="dark" class="swatch dark active" aria-label="Fundo escuro" title="Escuro"></button><button data-bg="light" class="swatch light" aria-label="Fundo claro" title="Claro"></button><button data-bg="grid" class="swatch grid" aria-label="Ver transparência" title="Transparência"></button></div>
+      </div>
+      <aside>
+        <p class="eyebrow">GESTOS E PRESENÇA</p><h2>Qual é o clima agora?</h2>
+        <p class="description">Experimente uma reação. Ele pausa os passos e depois retoma o que estava fazendo.</p>
+        <div class="reactions" aria-label="Reações do Yato">
+          <button data-reaction="wave" aria-pressed="false">Acenar</button><button data-reaction="think" aria-pressed="false">Pensar</button><button data-reaction="celebrate" aria-pressed="false">Comemorar</button><button data-reaction="sleep" aria-pressed="false">Cochilar</button><button data-reaction="wake" aria-pressed="false">Despertar</button>
+        </div>
+        <div class="motion-list">
+          <label class="motion"><span><b>Respiração</b><small>Um movimento leve, contínuo.</small></span><input type="checkbox" id="breathing" checked aria-label="Respiração"></label>
+          <label class="motion"><span><b>Piscadas naturais</b><small>Intervalos que variam com o tempo.</small></span><input type="checkbox" id="blinking" checked aria-label="Piscadas naturais"></label>
+          <label class="motion"><span><b>Balanço em repouso</b><small>Uma presença mais relaxada.</small></span><input type="checkbox" id="idleMotion" checked aria-label="Balanço em repouso"></label>
+          <label class="motion"><span><b>Acompanhar cursor</b><small>Inclina-se suavemente no palco.</small></span><input type="checkbox" id="following" checked aria-label="Acompanhar cursor"></label>
+          <label class="motion"><span><b>Caminhada lateral</b><small>Oito poses com balanço completo dos braços.</small></span><input type="checkbox" id="walking" aria-label="Caminhada lateral"></label>
+          <label class="motion"><span><b>Passear no palco</b><small>Deslocamento experimental.</small></span><input type="checkbox" id="wandering" aria-label="Passear no palco"></label>
+          <label class="motion"><span><b>Brilho e partículas</b><small>Presença digital em violeta.</small></span><input type="checkbox" id="effects" checked aria-label="Brilho e partículas"></label>
+        </div>
+        <button class="secondary" id="materialize">Testar pulso digital</button>
+        <div class="direction-controls" aria-label="Direção da caminhada"><span>Direção</span><button data-direction="-1" aria-pressed="false">← Esquerda</button><button data-direction="1" aria-pressed="true">Direita →</button></div>
+        <div class="manual speed"><label for="speed">Ritmo dos passos e gestos <output id="speed-value">1.0×</output></label><input type="range" id="speed" min="0.6" max="1.5" step="0.1" value="1" aria-label="Velocidade da animação"></div>
+        <button class="speak" id="speak"><span>▶</span> Ouvir o Yato <small>DEMO</small></button>
+        <p class="audio-note" id="audio-note">Voz de teste: Microsoft Daniel · pt-BR.<br>A boca acompanha a intensidade do áudio.</p>
+        <div class="manual"><label for="mouth">Abertura da boca <output id="mouth-value">0%</output></label><input type="range" id="mouth" min="0" max="1" step="0.01" value="0" aria-label="Abertura da boca"></div>
+        <button class="secondary" id="blink">Testar uma piscada</button>
+      </aside>
+    </section>
+    <footer><span><i class="dot"></i> BETA-2 LAB · BETA-1 E NATORI PRESERVADOS</span><span>Preto carvão <i class="palette charcoal"></i> Violeta <i class="palette violet"></i> Prata <i class="palette silver"></i></span></footer>
+  </main>
+  <div id="drag" title="Arraste pelo corpo. Botão direito abre os controles."></div>
+  <audio id="voice" preload="none"></audio>
+</body>
+</html>

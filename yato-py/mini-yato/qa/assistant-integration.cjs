@@ -1,0 +1,42 @@
+'use strict';
+const {app,BrowserWindow,screen}=require('electron');
+const http=require('node:http'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const Target=require('../avatar/display-target.cjs'),BubbleHost=require('../avatar/bubble-host.cjs');
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(fn){const end=Date.now()+6000;while(!await fn()){if(Date.now()>end)throw Error('Timed out');await pause(20);}}
+const timer=setTimeout(()=>app.exit(1),25000);
+app.whenReady().then(async()=>{
+  const messages=[];
+  const server=http.createServer(async(req,res)=>{
+    assert.equal(req.headers.authorization,'Bearer test-token');
+    let text='';for await(const chunk of req)text+=chunk;
+    messages.push(JSON.parse(text).text);
+    await pause(200);
+    res.setHeader('Content-Type','application/json');res.end(JSON.stringify({accepted:true,text:'Podemos conversar sobre isso, sim.'}));
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  process.env.YATO_ASSISTANT_URL=`http://127.0.0.1:${server.address().port}/message`;
+  process.env.YATO_ASSISTANT_TOKEN='test-token';
+  const display=Target.selectDisplay(screen,['--monitor=1']);
+  const parent=new BrowserWindow({...Target.windowBounds(display,{width:225,height:375}),show:false,webPreferences:{offscreen:true}});
+  const host=new BubbleHost({parent,getDisplay:()=>display,hidden:true});
+  const js=code=>host.window.webContents.executeJavaScript(code);
+  await until(()=>host.ready);host.compose();
+  await until(()=>js('!document.getElementById("command-form").hidden'));
+  await js('document.getElementById("command-input").value="Quero conversar sobre meu dia";document.getElementById("command-form").requestSubmit()');
+  await until(()=>host.busy);assert(host.hovered);
+  await until(()=>!host.busy);
+  assert.deepEqual(messages,['Quero conversar sobre meu dia']);
+  assert.equal(await js('document.getElementById("message").textContent'),'Podemos conversar sobre isso, sim.');
+  assert.equal(await host.assistantAction({action:'calculate',value:'18*27'}),'Resultado: 486');
+  const calls=[];host.commands.shell={openExternal:async url=>calls.push(url)};
+  await host.assistantAction({action:'google'});assert.deepEqual(calls,['https://www.google.com/']);
+  await assert.rejects(host.assistantAction({action:'shell',value:'calc.exe'}));
+  assert(Target.contains(display,host.window.getBounds()));
+  await pause(200);
+  fs.writeFileSync(path.join(__dirname,'assistant-preview.png'),(await host.window.webContents.capturePage()).toPNG());
+  host.destroy();parent.destroy();await new Promise(r=>server.close(r));clearTimeout(timer);
+  const result={ok:true,monitor:display.id,checks:['free text via authenticated HTTP','native IPC reply','busy state','arithmetic tool','Google tool mocked','unknown action rejected']};
+  fs.writeFileSync(path.join(__dirname,'assistant-integration-result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));app.quit();
+}).catch(e=>{console.error(e);app.exit(1);});
+app.on('window-all-closed',()=>{});

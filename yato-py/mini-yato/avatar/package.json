@@ -1,0 +1,7 @@
+{
+  "name": "yato-mini-solo",
+  "version": "0.2.0-beta.1",
+  "private": true,
+  "description": "Mini Yato independente com IA sob demanda; beta-1 preservado",
+  "main": "main.js"
+}
