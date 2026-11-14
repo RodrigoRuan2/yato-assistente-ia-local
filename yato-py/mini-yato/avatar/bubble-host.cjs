@@ -45,7 +45,7 @@ class BubbleHost {
     };
     this.onHeight = (event, height) => {
       if (!this.owns(event) || !Number.isFinite(height)) return;
-      height = Math.round(Math.max(92, Math.min(480, height)));
+      height = Math.round(Math.max(48, Math.min(480, height)));
       if (this.height === height) return;
       this.height = height;
       this.sync();
@@ -111,6 +111,13 @@ class BubbleHost {
     return this.commands.execute(actions[data.action]);
   }
   position() {
+    if(this.quick){
+      const parent=this.parent.getBounds(),area=this.getDisplay().workArea;
+      const width=Math.min(244,area.width),height=Math.min(this.height,area.height);
+      const x=Math.round(Math.max(area.x,Math.min(area.x+area.width-width,parent.x+parent.width/2-width/2)));
+      const y=Math.round(Math.max(area.y,Math.min(area.y+area.height-height,parent.y+parent.height*.06-height)));
+      return {x,y,width,height,side:'above'};
+    }
     return placement(this.parent.getBounds(), this.getDisplay().workArea, {width:316, height:this.height});
   }
   get hovered() {
@@ -156,6 +163,7 @@ class BubbleHost {
     const view = {...this.model.view(), side:this.side,editing:this.editing,busy:this.busy};
     view.fullText=this.model.message?.pages.join('')||'';
     if(this.editing){view.visible=true;view.text=this.commandResult||'Oi! O que você quer fazer?';view.fullText=view.text;view.kind='command';view.page=1;view.total=1;}
+    this.quick=view.quick=!this.editing&&['ambient','hint'].includes(view.kind);
     const info=this.editing?this.commandInfo:this.model.message?.info;
     view.source=info?.source||'';view.hasSource=Boolean(info&&this.safeSource(info.link));
     view.updated=info?new Date(info.published).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
@@ -164,6 +172,7 @@ class BubbleHost {
     if (view.visible) {
       const {side, ...bounds} = this.position();
       this.side = view.side = side;
+      view.tailX=Math.max(24,Math.min(bounds.width-24,this.parent.getBounds().x+this.parent.getBounds().width/2-bounds.x-8));
       const old = this.window.getBounds();
       if (Object.keys(bounds).some(key => old[key] !== bounds[key])) this.window.setBounds(bounds);
     }

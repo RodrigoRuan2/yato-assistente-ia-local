@@ -57,6 +57,10 @@ async function request(req, res) {
       if (!win || win.isDestroyed() || win.webContents.isLoading()) return send(res, 503, 'Avatar indisponível');
       let script;
       const action = url.searchParams.get('acao');
+      if(action==='informacao'){
+        if(!bubbles||bubbles.editing||bubbles.busy)return send(res,409,'Conversa em andamento');
+        bubbles.model.show(require('./bubble-model.cjs').information(4),'ambient');bubbles.sync();return send(res,200,'ok');
+      }
       if(action==='rotina') {
         const value=url.searchParams.get('valor');
         if(!desktop||!['0','1'].includes(value))return send(res,400,'Rotina inválida');

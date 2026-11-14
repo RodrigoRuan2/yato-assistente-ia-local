@@ -35,6 +35,18 @@ app.whenReady().then(async()=>{
   assert(Target.contains(display,host.window.getBounds()));
   await pause(200);
   fs.writeFileSync(path.join(__dirname,'assistant-preview.png'),(await host.window.webContents.capturePage()).toPNG());
+  assert.equal(await js('document.getElementById("kind")'),null);
+  await js('document.getElementById("close").click()');await until(()=>!host.editing);
+  host.model.show('23h… vai rolar uma partida ou hoje é descanso?','ambient');host.sync();
+  await until(()=>js('document.getElementById("bubble").classList.contains("quick")'));
+  await pause(250);
+  assert.equal(host.window.getBounds().width,244);
+  assert(Target.contains(display,host.window.getBounds()));
+  assert(await js('getComputedStyle(document.getElementById("close")).display==="none"'));
+  assert(await js('document.getElementById("message").scrollHeight<=document.getElementById("message").clientHeight+1'));
+  fs.writeFileSync(path.join(__dirname,'quick-preview.png'),(await host.window.webContents.capturePage()).toPNG());
+  host.compose();await until(()=>js('!document.getElementById("bubble").classList.contains("quick")'));
+  assert.equal(host.window.getBounds().width,316);
   host.destroy();parent.destroy();await new Promise(r=>server.close(r));clearTimeout(timer);
   const result={ok:true,monitor:display.id,checks:['free text via authenticated HTTP','native IPC reply','busy state','arithmetic tool','Google tool mocked','unknown action rejected']};
   fs.writeFileSync(path.join(__dirname,'assistant-integration-result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));app.quit();
