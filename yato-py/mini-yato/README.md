@@ -8,6 +8,11 @@ do Yato. O beta-1 e o aplicativo principal permanecem separados.
 Na instalação existente, execute **Abrir Mini Yato.vbs**. O avatar abre no monitor
 principal (monitor 1). Clique com o botão direito e escolha **Falar com o Yato**.
 Para encerrar o modo, use **Fechar** no menu do avatar.
+O mesmo menu oferece **Abrir Yato Chat** para iniciar a interface principal
+quando necessário, sem encerrar o mini. A proteção de instância única do chat
+continua valendo. O atalho do mini pode ser fixado na barra de tarefas pelo
+menu do Windows; atalhos locais não entram no GitHub porque contêm caminhos
+específicos de cada instalação.
 
 Em uma instalação nova, prepare o ambiente Python em `../.venv`, instale este
 `requirements.txt`, execute `npm install` em `../avatar-electron`, instale o

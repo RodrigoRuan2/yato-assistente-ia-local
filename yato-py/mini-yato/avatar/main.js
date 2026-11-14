@@ -174,7 +174,17 @@ function menuAction(action) {
 }
 function menuTemplate() {
   return [
-    { label:'Yato chibi · beta-2 LAB', enabled:false },
+    { label:'Mini Yato', enabled:false },
+    {label:'Abrir Yato Chat',click:()=>{
+      const root=path.resolve(__dirname,'../..');
+      const python=path.join(root,'.venv','Scripts','pythonw.exe');
+      const script=path.join(root,'app.py');
+      if(!fs.existsSync(python)||!fs.existsSync(script))return dialog.showErrorBox('Yato Chat','Não encontrei a instalação do chat principal.');
+      const child=require('node:child_process').spawn(python,[script],{cwd:root,detached:true,windowsHide:true,stdio:'ignore'});
+      child.on('error',()=>dialog.showErrorBox('Yato Chat','Não consegui abrir o chat principal.'));
+      child.unref();
+    }},
+    {type:'separator'},
     ...(desktop ? [{label:`Tamanho · ${sizePercent}%`,submenu:DesktopSize.OPTIONS.map(({percent,label})=>({
       label,type:'radio',checked:sizePercent===percent,click:()=>{
         try { applySize(percent); } catch {
