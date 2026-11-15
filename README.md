@@ -1,8 +1,8 @@
 <h1 align="center">Yato — assistente de IA 100% local</h1>
 
 <p align="center">
-  <em>Chat com personalidade, voz, ouvido, visão, avatar Live2D e estúdio de imagem —<br>
-  tudo rodando <strong>na sua máquina</strong>, sem nenhuma API paga e sem mandar seus dados pra nuvem.</em>
+  <em>Chat com personalidade, memória individual, avatar chibi próprio e estúdio de imagem —<br>
+  com inferência de IA <strong>na sua máquina</strong> e modo mini com IA sob demanda.</em>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="yato-py/assets/vitrine/chat-avatar.png" width="720" alt="Janela do Yato com o avatar Live2D ativo">
+  <img src="yato-py/assets/vitrine/yato-chibi.png" width="280" alt="Avatar chibi próprio do Yato, de corpo inteiro, com roupa preta e detalhes violetas">
 </p>
 
 ---
@@ -25,13 +25,36 @@ O **Yato** é um assistente de desktop (Windows) com personalidade própria, con
 do zero em Python. A regra do projeto é uma só: **tudo roda localmente** — o cérebro é
 um modelo aberto na GPU via [Ollama](https://ollama.com), a voz é sintetizada na CPU,
 o ouvido transcreve offline e as imagens são geradas pelo Stable Diffusion na sua placa.
-Zero chave de API, zero mensalidade, zero dado seu saindo da máquina.
+A inferência local não exige chave de API nem mensalidade. Pesquisa web e notícias
+acessam serviços externos; conversas e memórias são guardadas localmente e não entram no GitHub.
 
 Nasceu como projeto de estudo — **abrir a caixa-preta da IA** e entender tokens,
 contexto, temperatura e streaming na prática — e cresceu, rodada a rodada, até virar
 um assistente completo.
 
-## ✨ O que ele faz
+## 🐾 Avatar próprio e modo Só mini Yato
+
+O Yato ganhou uma identidade visual própria: **chibi de corpo inteiro**, com cabelo
+escuro, olhos violetas e roupa preta com detalhes roxos. A versão beta-1 foi
+preservada como referência; a evolução do mini acontece separadamente.
+
+O **[Só mini Yato](https://github.com/RodrigoRuan2/yato-assistente-ia-local/tree/experiment/mini-yato-solo/yato-py/mini-yato)** é a versão experimental atual do companheiro de desktop:
+
+- Avatar transparente com respiração, piscadas, caminhada e pausas;
+- Balão de conversa simples e balão pequeno acima da cabeça para informações rápidas;
+- Comentários curtos de horário, com intervalos longos; notícias apenas sob pedido;
+- Conversa com o modelo local, contexto, memória de preferências e ferramentas de cálculo e ações;
+- IA iniciada apenas quando você envia uma mensagem, com liberação do modelo após 30 segundos sem uso;
+- Opção **Abrir Yato Chat** no menu do mini, sem manter a janela principal aberta;
+- Dados individuais guardados localmente: cada instalação começa com a própria memória.
+
+**Disponibilidade:** o modo mini está na branch `experiment/mini-yato-solo`, em
+`yato-py/mini-yato/`. Ele não é a antiga pasta `yato-mini/` de React. Voz e microfone
+continuam no chat principal; o novo mini é focado em texto e menor consumo em repouso.
+
+**[Instruções](https://github.com/RodrigoRuan2/yato-assistente-ia-local/tree/experiment/mini-yato-solo/yato-py/mini-yato)** · **[Relatório de consumo e condições dos testes](https://github.com/RodrigoRuan2/yato-assistente-ia-local/blob/experiment/mini-yato-solo/yato-py/mini-yato/MEDICOES.md)**
+
+## ✨ Recursos do chat principal
 
 ### 💬 Conversa (e age)
 
@@ -58,17 +81,17 @@ O Yato **lê as respostas em voz alta** com o [Piper](https://github.com/rhasspy
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — aperte 🎤, fale, e a
 transcrição vira mensagem. Nenhum áudio sai da sua máquina.
 
-### 🎭 Avatar Live2D flutuante
+### 🎭 Avatar do Yato
 
-<p align="center">
-  <img src="yato-py/assets/vitrine/avatar-desktop.png" width="480" alt="Avatar Live2D flutuando com fundo transparente por cima de um jogo">
-</p>
+A apresentação atual usa o **chibi próprio do Yato**, animado em uma janela
+Electron transparente. O mini tem balões de conversa e informações rápidas,
+respiração, piscadas, caminhada com pausas e efeitos visuais.
 
-Um personagem **Live2D** que respira, pisca e faz **lip-sync de verdade**: o `voz.py`
-mede a força do som em janelas de ~55 ms e a boca acompanha as sílabas. A janela é um
-processo **Electron** à parte com **fundo transparente real** — só o personagem flutua
-por cima do que você estiver fazendo (na foto, uma partida de League of Legends 😄) —
-controlado pelo Python via ponte HTTP local.
+O avatar Live2D de demonstração foi usado nas primeiras versões e permanece como
+parte do histórico técnico. O chat principal já possui integração de boca com a
+voz; o modo mini experimental funciona por texto, sem carregar voz e microfone.
+
+Veja a **[versão com o avatar próprio](https://github.com/RodrigoRuan2/yato-assistente-ia-local/tree/experiment/mini-yato-solo/yato-py/mini-yato)**.
 
 ### 🎨 Estúdio de imagem
 
@@ -96,7 +119,7 @@ Geração de imagem local com o [Forge](https://github.com/lllyasviel/stable-dif
   <img src="yato-py/assets/vitrine/favoritos.png" width="720" alt="Biblioteca de moldes favoritos, com checkpoint e LoRA de cada um">
 </p>
 
-## 🧠 Arquitetura
+## 🧠 Arquitetura do chat principal (versão base)
 
 Cada módulo tem uma responsabilidade só — dá pra testar o cérebro sem abrir a janela:
 
@@ -124,7 +147,7 @@ app.py (a janela — CustomTkinter)
 | Interface | CustomTkinter | Janela nativa leve, sem navegador embutido |
 | Voz | Piper (`faber-medium` pt-BR) | TTS offline na CPU — não disputa a GPU com o cérebro |
 | Ouvido | faster-whisper (small) | Transcrição offline na CPU, mesma lógica |
-| Avatar | Electron + pixi-live2d-display | O único jeito de fundo **transparente de verdade** no Windows 11 |
+| Avatar | Electron + animação 2D própria no mini; Live2D na versão base | Personagem em janela transparente no desktop |
 | Imagem | Forge (SDXL / Illustrious) | API local `--api`, mesmo espírito do Ollama: HTTP sem chave |
 
 **Hardware de referência:** RTX 4060 Ti (8 GB VRAM) + 16 GB RAM. Os 8 GB são o teto
