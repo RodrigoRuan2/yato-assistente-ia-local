@@ -1,3 +1,6 @@
 # Normaliza quebras de linha: no repositório sempre LF,
 # evitando ruído de diff entre Windows / Linux / Mac.
 * text=auto eol=lf
+
+# Frozen beta-1 sources: preserve exact original bytes.
+yato-py/avatar-chibi-beta-1/** -text

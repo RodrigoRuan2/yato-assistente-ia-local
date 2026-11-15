@@ -1,0 +1,17 @@
+Use case: precise-object-edit
+Asset type: transparent 3x3 animation sprite sheet, exact same layout and character as input.
+Input image 1: EDIT TARGET, approved Yato sprite atlas. Preserve the target's composition and identity.
+Primary request: fix ONLY the swinging ARMS, hands and sleeves in its 8 walking poses. The current sheet incorrectly repeats the front swing every four poses. The near arm with the purple double chevron MUST actually swing BEHIND the body during the middle of the full cycle. This is critical. Do NOT change or regenerate the head, face, torso, hips, legs, shoes, purple straps, lighting, palette or pose sizes. Fill the small formerly occluded jacket area naturally where an arm moves.
+Square output, exactly 3 columns x 3 rows, nine equal cells, read left-to-right then top-to-bottom. All figures look screen RIGHT throughout. Keep cell9 (bottom-right standing pose) unchanged. No added text, numbers, lines or background; true transparent alpha.
+ARM POSES for the clearly visible NEAR arm bearing the purple sleeve chevron, relative to the vertical down from its shoulder:
+Cell1 upper-left: maximum modest forward swing toward RIGHT, hand in front of hip. Preserve this starting arm.
+Cell2 upper-middle: +20 degrees forward RIGHT, returning toward vertical.
+Cell3 upper-right: nearly VERTICAL below shoulder.
+Cell4 middle-left: -20 degrees BACKWARDS toward LEFT, hand now BEHIND hip. Crucial changed pose.
+Cell5 middle-center: maximum modest BACKWARDS swing -32 degrees LEFT, hand behind hip, sleeve extends down LEFT from shoulder; the purple chevron remains on this same near sleeve. Crucial changed pose.
+Cell6 middle-right: -20 degrees BACKWARDS LEFT, returning toward vertical. Crucial changed pose.
+Cell7 lower-left: nearly VERTICAL below shoulder.
+Cell8 lower-middle: +20 degrees FORWARD RIGHT, smoothly approaching cell1.
+Cell9 lower-right: original standing rest unchanged.
+FAR arm swings opposite: when near arm is behind LEFT, far hand appears forward RIGHT but stays behind torso depth. Keep correct anatomical occlusion. Elbows lightly bent, wrist softly trailing. There must be a clean front -> down -> back -> down -> front pendulum over ALL EIGHT cells, not two repeats of front->down->front.
+Constraints: identical head silhouette, face, dark neutral charcoal fabric colors, purple accents, line weight, sole positions, legs, identity and transparency as edit target. Do not add effects or change clothes. Do not globally brighten or recolor. Do not duplicate the forward arm in cells4,5,6.

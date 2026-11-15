@@ -1,0 +1,7 @@
+{
+  "name": "yato-chibi-preview",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prévia isolada do Yato chibi beta-1",
+  "main": "main.js"
+}

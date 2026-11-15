@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yato · Estúdio chibi</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="avatar.js" defer></script>
+</head>
+<body>
+  <main class="studio">
+    <header><a class="brand" href="#">Y<span>Λ</span>TO <small>BETA—1</small></a><span class="edition">ESTUDO DE PERSONAGEM <i>01 / CHIBI</i></span></header>
+    <section class="intro"><div><p class="eyebrow">MESMA ESSÊNCIA. NOVOS MOVIMENTOS.</p><h1>Um rosto só dele<span>.</span></h1><p class="lead">Cabelo bagunçado. Olhar violeta. Um pouco de atitude.</p></div><span class="version">CONCEITO V1<br><b>3,5 cabeças · anime chibi</b></span></section>
+    <section class="workspace">
+      <div class="stage" id="stage">
+        <div class="stage-label"><span class="dot"></span><span id="status" role="status">Carregando arte…</span></div>
+        <span class="stage-note">YATO / CORPO INTEIRO</span>
+        <div class="ground"></div>
+        <canvas id="avatar" aria-label="Yato chibi animado de corpo inteiro"></canvas>
+        <div class="caption"><span id="action-label">Presença tranquila.</span><small>Prévia de movimento · sprites 2D</small></div>
+        <div class="backgrounds" aria-label="Fundo do palco"><button data-bg="dark" class="swatch dark active" aria-label="Fundo escuro" title="Escuro"></button><button data-bg="light" class="swatch light" aria-label="Fundo claro" title="Claro"></button><button data-bg="grid" class="swatch grid" aria-label="Ver transparência" title="Transparência"></button></div>
+      </div>
+      <aside>
+        <p class="eyebrow">LABORATÓRIO DE MOVIMENTOS</p><h2>Pequenos gestos.<br>Mais presença.</h2>
+        <p class="description">Explore os primeiros movimentos do Yato. A arte e as animações ainda podem ser refinadas.</p>
+        <div class="motion-list">
+          <label class="motion"><span><b>Respiração</b><small>Um movimento leve, contínuo.</small></span><input type="checkbox" id="breathing" checked aria-label="Respiração"></label>
+          <label class="motion"><span><b>Piscadas naturais</b><small>Intervalos que variam com o tempo.</small></span><input type="checkbox" id="blinking" checked aria-label="Piscadas naturais"></label>
+          <label class="motion"><span><b>Caminhada</b><small>Quatro poses em um ciclo inicial.</small></span><input type="checkbox" id="walking" aria-label="Caminhada"></label>
+          <label class="motion"><span><b>Passear no palco</b><small>Deslocamento experimental.</small></span><input type="checkbox" id="wandering" aria-label="Passear no palco"></label>
+        </div>
+        <button class="speak" id="speak"><span>▶</span> Ouvir o Yato <small>DEMO</small></button>
+        <p class="audio-note" id="audio-note">Voz de teste: Microsoft Daniel · pt-BR.<br>A boca acompanha a intensidade do áudio.</p>
+        <div class="manual"><label for="mouth">Abertura da boca <output id="mouth-value">0%</output></label><input type="range" id="mouth" min="0" max="1" step="0.01" value="0" aria-label="Abertura da boca"></div>
+        <button class="secondary" id="blink">Testar uma piscada</button>
+      </aside>
+    </section>
+    <footer><span><i class="dot"></i> PRÉVIA INDEPENDENTE · NATORI PRESERVADO</span><span>Preto carvão <i class="palette charcoal"></i> Violeta <i class="palette violet"></i> Prata <i class="palette silver"></i></span></footer>
+  </main>
+  <div id="drag" title="Arraste pelo corpo. Botão direito abre os controles."></div>
+  <audio id="voice" src="assets/fala-demo.wav" preload="auto"></audio>
+</body>
+</html>

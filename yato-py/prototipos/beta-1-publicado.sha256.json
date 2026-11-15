@@ -1,0 +1,82 @@
+{
+  "version": "beta-1",
+  "localOriginalFilesVerified": 29,
+  "snapshot": "avatar-chibi-beta-1",
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 38,
+      "sha256": "176EEDC19FB1DD3336BF70D6C2CB5CDC870F5AA132C98130F001BA87830FE9E7"
+    },
+    {
+      "path": "Abrir demonstracao.bat",
+      "bytes": 129,
+      "sha256": "3516D6E6B81CCDBD74518DEFE566AF207F1743C2387038AF4720D185038184D4"
+    },
+    {
+      "path": "Abrir no desktop.bat",
+      "bytes": 139,
+      "sha256": "97944C0B584EDC5D01A45CB1AE220106AB67791D626B04A2C55F85A9BF16D35B"
+    },
+    {
+      "path": "avatar.js",
+      "bytes": 8403,
+      "sha256": "9FC8005E16E9560232C522053B6D13EF3CFA68D3312469E5EE6C4B7AFA86C3CA"
+    },
+    {
+      "path": "gerar_envelope.py",
+      "bytes": 579,
+      "sha256": "18E0F5A73D619CC17505A6379A2374749E6C8702881BE8379DF189CF9E5FF540"
+    },
+    {
+      "path": "index.html",
+      "bytes": 3667,
+      "sha256": "CA7A7A89EAFD2E09173F3D1E6E001AD402510ED5DF1E1A2B43FF38FB5EBDD7BE"
+    },
+    {
+      "path": "main.js",
+      "bytes": 9671,
+      "sha256": "B8BBEA77AA87641C30B7A1AE289ABC09B2D2F97E9A110D289411CF65A4F9E6A3"
+    },
+    {
+      "path": "package.json",
+      "bytes": 154,
+      "sha256": "0A3DBA8216D9856A547E646E295F3CF26323B33D4E5F7A591AA2B6606E8B1BE8"
+    },
+    {
+      "path": "preload.js",
+      "bytes": 331,
+      "sha256": "70D4C90566953D974830EE6F36BC8722F7B98DA6F12D8C4A95964E378A057636"
+    },
+    {
+      "path": "prompts.txt",
+      "bytes": 3745,
+      "sha256": "078A341609FF8929D5CC0A1BB4B0A123B3C4368E710E13CBC7B1EDBDB19A8F15"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5216,
+      "sha256": "CEEDA5A7651425AE4FF162C383B39681950FB3082FCE80EDE8EE5BF2B2A2F887"
+    },
+    {
+      "path": "style.css",
+      "bytes": 6172,
+      "sha256": "5A0055E98E92484A2799B60089D1D967748D558FF41FC2BDD1D47512EDF3166C"
+    },
+    {
+      "path": "assets/fala-demo.json",
+      "bytes": 1674,
+      "sha256": "D4D10C7E9A9AE989712D066AA2040014995CC65060C22B3BBF214BB1C8843662"
+    },
+    {
+      "path": "assets/yato-chibi-conceito-v1.png",
+      "bytes": 1522583,
+      "sha256": "4D32EA1EE67DA5043F2EC05731E82C4066A6B5A1D4DAA43163BE8050F0AA303C"
+    },
+    {
+      "path": "assets/yato-chibi-sprites-v1.png",
+      "bytes": 1230532,
+      "sha256": "71ECB31C85A7837A9731CB3F2D00690655FDEC5229699F5C1F451754437E0989"
+    }
+  ]
+}

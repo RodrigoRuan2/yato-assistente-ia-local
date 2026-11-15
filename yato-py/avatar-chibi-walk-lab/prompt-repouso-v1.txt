@@ -1,0 +1,16 @@
+Use case: identity-preserve
+Asset type: transparent animation sprite atlas for the existing Yato desktop character.
+Input image 1 is the identity/style reference. Use ONLY its top-left NEUTRAL FRONT STANDING character as the base. Make a new 3x3 sheet of nine subtle idle key poses of THAT EXACT SAME YATO, all viewed from the FRONT. Ignore its walking poses.
+Square canvas, exactly 3 columns and 3 rows with equal cells. Nine full-body figures at identical scale, identical head center, identical sole baseline and generous transparent margins. True transparent alpha, no background, floor, shadow, text, labels or grid.
+Preserve the exact dark charcoal hoodie, violet trims, YATO chest logo, black cargo pants, violet buckles/straps, silver chain, black-violet sneakers, messy black-violet hair, violet eyes and confident quiet expression. The body is elongated anime-chibi. Same lighting, palette and ink line weight in every cell. Do NOT enlarge heads or vary hair, facial proportions, brightness or outfit.
+Read cells left to right, top to bottom:
+1. EXACT neutral standing pose from top-left of reference: arms relaxed down, two feet planted, gaze forward.
+2. Gently shift weight onto screen-left leg, opposite knee slightly relaxed, hips shifted only slightly left and shoulders subtly counterbalance. Both soles remain planted. Arms relaxed.
+3. Same very small weight transfer to screen-right leg. No step, no leg crossing.
+4. Sleeve adjustment anticipation: screen-left forearm raised diagonally across waist, fingertips approaching the cuff of the screen-right sleeve; screen-right elbow slightly bent forward at waist. Movement is casual and small. Face stays facing forward.
+5. Sleeve adjustment: screen-left hand now gently pinches/tugs the screen-right cuff near wrist by a few centimeters. Clearly a hand touching fabric, no extra hands. Same torso, legs, face, scale and framing as cell4.
+6. Pocket approach: the screen-left hand reaches toward the LEFT HIP CARGO-PANTS pocket, elbow bent slightly, fingers at the opening. The other arm rests down. All proportions and head identical to neutral.
+7. Pocket rest: the same screen-left hand is slipped naturally into that same left hip pocket, thumb just outside, elbow slightly out. Other arm down. Relaxed stance.
+8. Neutral standing exactly like cell1, only the EYES look gently toward screen-left; hair, skull, nose, neck and head silhouette remain fixed. Quiet curiosity, no eyebrow expression change.
+9. Neutral standing exactly like cell1, only the EYES look gently toward screen-right, head silhouette fixed.
+Constraints: coherent animation key poses, no 3D rig aesthetic, no action stance, no mouth opening, no hand touching face, no sparks or glow. Especially preserve a single identical head silhouette across all nine frames and the SAME shoe positions for cells1,4,5,6,7,8,9. Subtle changes, not nine redesigns. Reuse the same dark charcoal palette everywhere.

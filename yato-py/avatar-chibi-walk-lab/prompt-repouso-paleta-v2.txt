@@ -1,0 +1,6 @@
+Use case: precise-object-edit
+Input image1 is the EDIT TARGET: Yato nine-pose idle sprite sheet, 3x3.
+Input image2 is the COLOR REFERENCE: existing approved original Yato sprite sheet, especially its neutral top-left pose.
+Change ONLY fabric colors in target image1 to match the darker neutral charcoal CLOTHING of reference image2. The target's cargo pants and hoodie midtones became visibly too light grey. Make target PANTS charcoal midtones about 15–18% darker in every cell, and bring hoodie fabric into the same original charcoal palette. Preserve relative shading and purple accents. Blacks should look like the original dark charcoal, not washed grey or brown.
+All NINE poses and all silhouettes must stay exactly as image1: weight shifts, hand adjusting sleeve, hand entering pocket, eyes glancing each direction. Keep identical anatomy, head, face, hair, skin, shoes, dimensions, sole positions, cell layout, transparency, lines and garment details. No redesign, no new poses, no moving hands, no changing expressions, no added glow. Hair, skin and eye colors must remain unchanged. Match the clothing consistently across the entire atlas with no cell-to-cell lighting changes.
+Output a square 3x3 atlas with true transparency and no labels or background. Color-correction edit only.

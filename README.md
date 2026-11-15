@@ -54,6 +54,12 @@ continuam no chat principal; o novo mini é focado em texto e menor consumo em r
 
 **[Instruções](https://github.com/RodrigoRuan2/yato-assistente-ia-local/tree/experiment/mini-yato-solo/yato-py/mini-yato)** · **[Relatório de consumo e condições dos testes](https://github.com/RodrigoRuan2/yato-assistente-ia-local/blob/experiment/mini-yato-solo/yato-py/mini-yato/MEDICOES.md)**
 
+## 🧪 Protótipos separados
+
+O **[catálogo dos protótipos](https://github.com/RodrigoRuan2/yato-assistente-ia-local/tree/experiment/prototipos/yato-py/prototipos)** reúne o beta-1 preservado, a prévia original, o laboratório do avatar, o rig 2D, os estudos de caminhada/repouso e os modelos de balão. Cada experimento fica em sua própria pasta, com instruções de execução. O mini atual continua na branch `experiment/mini-yato-solo`.
+
+Código e artes são publicados sem conversas, memórias ou configurações pessoais. O catálogo inclui um manifesto SHA-256 para conferir os arquivos públicos do beta-1.
+
 ## ✨ Recursos do chat principal
 
 ### 💬 Conversa (e age)

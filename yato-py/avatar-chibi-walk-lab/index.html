@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yato · Repouso LAB</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="motion.js" defer></script>
+  <script src="effects.js" defer></script>
+  <script src="idle.js" defer></script>
+  <script src="avatar.js" defer></script>
+</head>
+<body>
+  <main class="studio">
+    <header>
+      <a class="brand" href="#" aria-label="Yato">Y<span>Λ</span>TO</a>
+      <span class="edition"><i class="edition-dot"></i> PRESENÇA <span class="pill">REPOUSO 01</span></span>
+      <span class="preserved">Principal e beta-1 preservados</span>
+    </header>
+    <section class="intro">
+      <div><p class="eyebrow">ESTÚDIO DE MOVIMENTO</p><h1>Mesmo parado. <span>Presente.</span></h1><p class="lead">Pequenos gestos, pausas e um olhar curioso.</p></div>
+      <p class="version">PRÉVIA NO MONITOR 2<br><b>Compare antes de levar ao principal</b></p>
+    </section>
+    <section class="workspace">
+      <div class="stage" id="stage">
+        <div class="stage-label"><span class="dot"></span><span id="status" role="status">Preparando o Yato…</span></div>
+        <span class="stage-note">YATO / GESTOS DE REPOUSO</span>
+        <div class="floor-line"></div><div class="ground"></div>
+        <canvas id="avatar" aria-label="Yato chibi de corpo inteiro com caminhada refinada"></canvas>
+        <div class="caption"><span id="action-label">Presença tranquila.</span><small>Um gesto de cada vez. Espaço para descansar.</small></div>
+        <div class="backgrounds" aria-label="Fundo do palco">
+          <button data-bg="dark" class="swatch dark active" aria-label="Fundo escuro" title="Escuro"></button>
+          <button data-bg="light" class="swatch light" aria-label="Fundo claro" title="Claro"></button>
+          <button data-bg="grid" class="swatch grid" aria-label="Ver transparência" title="Transparência"></button>
+        </div>
+      </div>
+      <aside>
+        <p class="eyebrow">GESTOS &amp; PAUSAS</p><h2>Um pouco mais de Yato.</h2>
+        <p class="description">A demonstração encurta as pausas para você conhecer os quatro gestos.</p>
+        <button class="primary" id="idle-demo" aria-pressed="false">Demonstrar movimentos de repouso</button>
+        <div class="reactions idle-buttons" aria-label="Movimentos de repouso"><button data-idle="weight" aria-pressed="false">Mudar apoio</button><button data-idle="sleeve" aria-pressed="false">Ajeitar manga</button><button data-idle="pocket" aria-pressed="false">Mão no bolso</button><button data-idle="look" aria-pressed="false">Observar</button></div>
+        <label class="motion"><span><b>Gestos espontâneos</b><small>Intervalos naturais de 10 a 22 segundos.</small></span><input type="checkbox" id="idle-gestures" checked aria-label="Gestos espontâneos"></label>
+        <details class="control-section">
+        <summary>Caminhada e comparação <span>+</span></summary>
+        <button class="primary" id="walk-demo" aria-pressed="false"><span class="button-icon">▶</span> Reproduzir caminhada</button>
+        <button class="stop-button" id="natural-stop"><span class="button-icon">◼</span> Parar com suavidade</button>
+        <div class="motion-list main-motions">
+          <label class="motion"><span><b>Balanço completo dos braços</b><small>Desligue para comparar com o ciclo 02 anterior.</small></span><input type="checkbox" id="refined" checked aria-label="Balanço completo dos braços"></label>
+          <p class="compare-note">A entrada e a parada suaves continuam ativas nas duas opções.</p>
+          <label class="motion"><span><b>Caminhar</b><small>Conclui a passada ao desligar.</small></span><input type="checkbox" id="walking" aria-label="Caminhar"></label>
+          <label class="motion"><span><b>Passear no palco</b><small>Deslocar-se enquanto caminha.</small></span><input type="checkbox" id="wandering" aria-label="Passear no palco"></label>
+        </div>
+        <div class="direction-controls" aria-label="Direção da caminhada"><span>Direção</span><button data-direction="-1" aria-pressed="false">← Esquerda</button><button data-direction="1" aria-pressed="true">Direita →</button></div>
+        <div class="manual speed"><label for="speed">Ritmo <output id="speed-value">1.0×</output></label><input type="range" id="speed" min="0.6" max="1.5" step="0.1" value="1" aria-label="Velocidade da animação"></div>
+        </details>
+        <details class="control-section" open>
+          <summary>Presença digital <span>+</span></summary>
+          <div class="motion-list minor-motions"><label class="motion compact"><span><b>Brilho e partículas</b><small>Violeta discreto, sem piscar a cada passo.</small></span><input type="checkbox" id="effects" aria-label="Brilho e partículas"></label></div>
+          <button class="secondary" id="materialize">Testar pulso digital</button>
+        </details>
+        <details class="control-section">
+          <summary>Presença e expressões <span>+</span></summary>
+          <div class="motion-list minor-motions">
+            <label class="motion compact"><span><b>Respiração</b></span><input type="checkbox" id="breathing" checked aria-label="Respiração"></label>
+            <label class="motion compact"><span><b>Piscadas</b></span><input type="checkbox" id="blinking" checked aria-label="Piscadas naturais"></label>
+            <label class="motion compact"><span><b>Balanço em repouso</b></span><input type="checkbox" id="idleMotion" checked aria-label="Balanço em repouso"></label>
+            <label class="motion compact"><span><b>Acompanhar cursor</b></span><input type="checkbox" id="following" checked aria-label="Acompanhar cursor"></label>
+          </div>
+          <div class="reactions" aria-label="Reações do Yato"><button data-reaction="wave" aria-pressed="false">Acenar</button><button data-reaction="think" aria-pressed="false">Pensar</button><button data-reaction="celebrate" aria-pressed="false">Comemorar</button><button data-reaction="sleep" aria-pressed="false">Cochilar</button><button data-reaction="wake" aria-pressed="false">Despertar</button></div>
+          <button class="secondary" id="blink">Testar uma piscada</button>
+        </details>
+        <details class="control-section">
+          <summary>Voz de demonstração <span>+</span></summary>
+          <button class="speak" id="speak"><span>▶</span> Ouvir o Yato <small>DEMO</small></button>
+          <p class="audio-note" id="audio-note">Microsoft Daniel · pt-BR.<br>A boca acompanha a intensidade do áudio.</p>
+          <div class="manual"><label for="mouth">Abertura da boca <output id="mouth-value">0%</output></label><input type="range" id="mouth" min="0" max="1" step="0.01" value="0" aria-label="Abertura da boca"></div>
+        </details>
+        <p class="prototype-note"><span class="tiny-dot"></span> Cópia independente para comparar.</p>
+      </aside>
+    </section>
+    <footer><span>YATO / LABORATÓRIO DE ANIMAÇÃO</span><span><i class="palette charcoal"></i> Carvão <i class="palette violet"></i> Violeta <i class="palette silver"></i> Prata</span></footer>
+  </main>
+  <div id="drag" title="Arraste pelo corpo. Botão direito abre os controles."></div>
+  <audio id="voice" src="assets/fala-demo.wav" preload="auto"></audio>
+</body>
+</html>

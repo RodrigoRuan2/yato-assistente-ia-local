@@ -1,0 +1,7 @@
+{
+  "name": "yato-chibi-rig-lab",
+  "version": "0.1.0-rig.1",
+  "private": true,
+  "description": "Protótipo independente de rig 2D do Yato; beta-1 e laboratório de sprites preservados",
+  "main": "main.js"
+}

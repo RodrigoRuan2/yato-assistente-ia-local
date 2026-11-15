@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {OnlineInfo,parseNews,FEEDS}=require('../online-info.cjs');
+const H=3600000;let now=Date.parse('2026-11-14T12:00:00Z');
+const item=(title,link,date)=>`<item><title><![CDATA[${title}]]></title><link>${link}</link><pubDate>${date}</pubDate></item>`;
+const date=new Date(now-H).toUTCString();
+const xml='<rss>'+item('Novo modelo de IA &amp; tecnologia','https://canaltech.com.br/inteligencia-artificial/novo',date)+item('Carros','https://canaltech.com.br/carros/test',date)+item('Velho','https://canaltech.com.br/hardware/old',new Date(now-80*H).toUTCString())+item('Script','javascript:alert(1)',date)+'</rss>';
+(async()=>{
+  const parsed=parseNews(xml,FEEDS[0],now);assert.equal(parsed.length,1);assert.match(parsed[0].text,/IA & tecnologia/);
+  const saves=[];const service=new OnlineInfo({now:()=>now,settings:{weatherLocation:{label:'Cidade de exemplo',latitude:0,longitude:0}},save:x=>saves.push(x),load:async url=>url.includes('forecast')?JSON.stringify({current:{time:'2026-11-14T09:00',temperature_2m:23,weather_code:2},daily:{time:['2026-11-14'],precipitation_probability_max:[70]}}):xml});
+  assert.equal(service.due(),null);now+=61000;assert.equal(service.due(),'news');
+  const news=await service.get('news');service.shown(news);assert.equal(service.due(),null);assert.equal(await service.get('news'),null);
+  now+=21*60000;assert.equal(service.due(),'weather');
+  const weather=await service.get('weather');assert.match(weather.text,/23 °C/);assert.match(weather.text,/70%/);service.shown(weather);
+  now+=5*H;assert.notEqual(service.due(),'news');now+=H;assert.equal(service.due(),'news');service.shown({...news,id:'second'});
+  now+=7*H;assert.notEqual(service.due(),'news');
+  const reopened=new OnlineInfo({now:()=>now,settings:{...service.settings},save:()=>{}});now+=61000;assert.notEqual(reopened.due(),'news');
+  const failed=new OnlineInfo({settings:service.settings,load:async()=>{throw Error('offline');},now:()=>now});await assert.rejects(()=>failed.get('weather'));await assert.rejects(()=>failed.get('news'));
+  assert.equal(saves.at(-1).onlineHistory.newsCount,2);
+  console.log(JSON.stringify({ok:true,checks:['topic filtering','RSS entities','freshness and safe links','weather fields','daily quota','six hour news spacing','spacing between cards','persisted quota','no repeated headline','offline rejection']}));
+})().catch(e=>{console.error(e);process.exitCode=1;});

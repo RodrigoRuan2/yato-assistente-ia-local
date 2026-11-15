@@ -1,0 +1,16 @@
+Edit the supplied Yato sprite reference into ONE coherent, production-ready walk cycle sprite atlas. Preserve this exact character identity, drawing style, dark outfit, violet accents, hair shape, face, and sneaker design. Do not lighten the character.
+
+Asset: transparent-background 3 by 3 sprite atlas, EXACTLY 9 equal square cells, read left to right then top to bottom. One complete full-body character per cell with generous transparent padding, same scale and foot baseline in every cell. All characters face screen RIGHT in the exact same profile / slight three-quarter side view as the first row of the reference. No text, no labels, no grid lines, no floor or cast shadow.
+
+Cells 1-8 are successive equally spaced phases of ONE two-step walking cycle, each 1/8 cycle apart. Correct continuous foot progression matters more than decorative motion. Keep the head, torso and facial expression nearly identical at the same screen coordinates; move the legs and arms naturally. Anatomically coherent legs, no duplicate limbs, no switching costume details.
+1: contact A: near leg forward, heel touching; far leg extended behind, toe touching. Opposite arm swing.
+2: down A: weight moves onto the near planted foot, knees gently absorb; far heel lifts and foot begins passing forward.
+3: passing A: near foot flat beneath body supporting weight, far knee and foot pass under hips with foot lifted.
+4: up A: near heel rises behind the hips, far leg extends forward toward next heel strike.
+5: contact B: far leg forward heel touching, near leg extended behind toe touching; arms opposite to cell 1.
+6: down B: weight on far planted foot, near foot lifts and begins passing forward.
+7: passing B: far foot flat beneath body, near knee and foot pass under hips with foot lifted.
+8: up B: far heel rises behind hips, near leg extends forward to seamlessly return to cell 1.
+9: relaxed standing side pose, both feet flat under hips, arms at sides, for preparation and settling.
+
+PALLETTE AND TEMPORAL CONTINUITY ARE CRITICAL: use exactly the SAME dark charcoal fabric base colors and violet accent colors sampled from the reference in ALL nine cells. Uniform soft neutral illumination, identical cel shading and outline thickness. NO alternating exposure, no lifted blacks, no brightening on passing poses, no warm/cool shifts, no plastic glossy shading. Hair silhouette and size stable. Same face and eye hue throughout. Same jacket length, trousers, chains, purple straps and shoes throughout. Feet separated enough to clearly read support and swing phases, modest natural stride rather than marching. No squash-and-stretch or growing/shrinking head. Preserve the recognizable Yato linework and palette; output clean actual alpha transparency.

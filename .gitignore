@@ -13,3 +13,24 @@ yato-py/avatar/modelos/
 # Lixo de sistema operacional
 Thumbs.db
 .DS_Store
+
+# Prototype publication: local profiles and generated output stay private.
+**/desktop-settings.json
+**/session.json
+**/conversation.json
+**/fatos.json
+**/config.json
+**/data/
+**/node_modules/
+**/__pycache__/
+**/*.pyc
+**/*.lnk
+**/*.log
+**/*.err
+yato-py/avatar-chibi-*/qa/*.png
+yato-py/avatar-chibi-*/qa/*.json
+yato-py/avatar-chibi-*/preservacao.json
+yato-py/avatar-chibi-*/assets/*.wav
+yato-py/design/**/*.png
+yato-py/design/**/validation.json
+yato-py/avatar-releases/

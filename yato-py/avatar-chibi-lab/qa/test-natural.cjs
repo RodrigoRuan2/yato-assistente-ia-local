@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {parse}=require('../commands.cjs');
+for(const [request,value] of [['quanto é 18 vezes 27?',486],['calcula (2 + 3) * 4',20],['20% de 350',70],['12,5 mais 3',15.5],['2^3^2',512],['-2^2',-4],['1 / 4',.25]])assert.equal(parse(request).value,value,request);
+assert.match(parse('1/0').error,/zero/);
+assert(parse('(1+2').error);
+assert(parse('9^999').error);
+for(const request of ['pode abrir o Google pra mim?','Yato, por favor abre o Google!'])assert.equal(parse(request).kind,'google',request);
+assert.equal(parse('poderia abrir a pasta Meus Jogos por favor?').name,'Meus Jogos');
+assert.equal(parse('me mostra as notícias sobre jogos').kind,'news');
+assert.equal(parse('como tá o tempo hoje?').kind,'weather');
+for(const request of ['não abre o Google','quanto é process.exit()','2; require("fs")','abre o Google e apaga tudo'])assert.equal(parse(request).kind,'help');
+console.log('PASS: natural requests, arithmetic precedence, percentages, invalid input and negation');

@@ -1,0 +1,7 @@
+{
+  "name": "yato-chibi-walk-lab",
+  "version": "0.3.0-walk.1",
+  "private": true,
+  "description": "Refinamento independente da caminhada em poses do Yato; beta-1 preservado",
+  "main": "main.js"
+}
